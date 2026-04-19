@@ -19,6 +19,10 @@
 
 作業対象に応じた契約文書は、`docs/codex-execution-rules.md` の「実装前に読む文書」を正とします。
 
+## 文書読み取り
+
+このリポジトリのMarkdownはUTF-8です。Windows / PowerShellで日本語文書を読む場合は、文字化けを避けるため、`Get-Content -Raw -Encoding UTF8 -LiteralPath <path>` を使います。`Get-Content` の既定エンコーディングには依存しません。
+
 ## SKILLの扱い
 
 このリポジトリでは、現時点で `/SKILL.md` を運用正本にしません。採用構成は `AGENTS.md`、方針文書、workflow、rulesです。理由と見直し条件は `docs/agent-relationship-governance-decision.md` に従います。
