@@ -1,7 +1,7 @@
-# M0 Readiness Gate Reframed
+﻿# M0 Readiness Gate
 
 **作成日:** 2026-04-19
-**目的:** M0ゲートを人間承認待ちではなく、AIがM1へ進むために満たす準備完了ゲートとして再定義する。
+**目的:** AIがM1へ進むために満たすM0準備完了ゲートを定義する。
 
 ## 1. 判定ルール
 
@@ -18,11 +18,11 @@ M2以降のDB/RLS/RPCへ進む場合は、AI自己監査ゲートを満たす。
 | G0-ENV | 環境分離準備 | localはSupabase localまたは非本番project、previewはproductionと分離、productionデータをpreviewで使わない。M1ではenv名と禁止値チェックを先に作る。 | `NEXT_PUBLIC_*` 以外をブラウザに置かない方針、production参照禁止、local-onlyで進める範囲が記録済み。 | 実Supabase project、Production URL、secret、Preview/Production接続を設定する直前だけ必要。 | 実環境接続、Preview E2E、M8 deploy。M1骨格は止めない。 |
 | G0-AUTH | Auth Redirect準備 | Auth Callbackは `/auth/callback/` の静的ページ。サーバーcallback、SSR、API Routesは作らない。 | local/preview/productionすべてで `/auth/callback/` を使う前提、未確定URLの扱い、静的export制約が記録済み。 | 実URL登録時だけ必要。 | 実Magic Link疎通、M8 Auth確認。M1のcallback実装は止めない。 |
 | G0-RLS-VERIFY | RLS/RPC検証方式 | M2では再実行可能なSQLまたはSupabase local手順とチェックリストで検証し、M7で再実行する。 | A/B分離、anon拒否、direct CRUD拒否、grant/revoke、RPC重要仕様の最低検証項目が定義済み。 | 不要。検証方式はAIが決める。 | M2 DB/RLS、M3/M4 RPC。 |
-| G0-AUDIT | AI自己監査ゲート | 旧human review gateをAI自己監査に置換する。危険領域では設計、影響範囲、権限、代替案、検証、記録をAIが完了条件として満たす。 | 対象変更、事前資料、監査観点、通過条件、差し戻し時の停止範囲が記録済み。 | 不要。人間承認者名は不要。 | DB/RLS/RPC/security definer、認可境界Data Access。 |
-| G0-DOMAIN | 未確定仕様のAI再分類 | Q-04/Q-06/Q-09/Q-10は即決、Q-05/Q-07は安全側の仮決定、Q-08はM8保留、Q-01だけ限定的人間確認。 | `docs/m0-open-questions-reframed.md` に分類、採用案、優先軸、リスク、停止範囲が記録済み。 | Q-01の実環境、Q-08の本番前backup/exportだけ必要。 | 該当する実環境またはM8 deploy。M1は止めない。 |
+| G0-AUDIT | AI自己監査ゲート | 危険領域では設計、影響範囲、権限、代替案、検証、記録をAIが完了条件として満たす。 | 対象変更、事前資料、監査観点、通過条件、差し戻し時の停止範囲が記録済み。 | 不要。人間承認者名は不要。 | DB/RLS/RPC/security definer、認可境界Data Access。 |
+| G0-DOMAIN | 未確定仕様のAI分類 | Q-04/Q-06/Q-09/Q-10は即決、Q-05/Q-07は安全側の仮決定、Q-08はM8保留、Q-01だけ限定的人間確認。 | `docs/m0-decision-matrix.md` に分類、採用方針、優先軸、リスク、停止範囲が記録済み。 | Q-01の実環境、Q-08の本番前backup/exportだけ必要。 | 該当する実環境またはM8 deploy。M1は止めない。 |
 | G0-BACKUP | Backup/Export保留ゲート | ユーザー向けexport UIは作らない。運用側backup/export確認はM8まで保留する。 | M8で確認する内容、UI非対象、Production deploy前に止める条件が記録済み。 | Supabase plan、backup可否、手動export手順はM8で必要。 | M8-03、M8-04、本番deploy。 |
 | G0-TESTOPS | テスト運用準備 | M1で `lint`、`typecheck`、`test`、`test:e2e`、`build` 相当のnpm scriptsを固定する。RLS/RPC検証はM2で別管理する。 | 未実施記録テンプレート、M7必須検証、Playwright viewport、DB検証再実行方針が定義済み。 | 不要。 | M7完了、M8 deploy、完了報告。 |
-| G0-LOGGING | 証跡とログ方針 | PRがある場合はPR本文を正式記録、PR前やAI単独作業ではdocs内worklogを使う。チャットのみを正式証跡にしない。 | 採用案、検証、未実施、残リスク、ログ禁止項目の記録方式が定義済み。 | 不要。 | M2以降の自己監査完了、M7/M8証跡確認。 |
+| G0-LOGGING | 証跡とログ方針 | PRがある場合はPR本文を正式記録、PR前やAI単独作業では該当タスクの作業記録を使う。チャットのみを正式証跡にしない。 | 採用方針、検証、未実施、残リスク、ログ禁止項目の記録方式が定義済み。 | 不要。 | M2以降の自己監査完了、M7/M8証跡確認。 |
 
 ## 3. AI自己監査の最低資料
 
@@ -30,7 +30,7 @@ M2以降のDB/RLS/RPCへ進む場合は、AI自己監査ゲートを満たす。
 
 | 資料 | 必須内容 |
 |---|---|
-| 採用案 | 何を決めたか、なぜその案か、代替案を退けた理由 |
+| 採用方針 | 何を決めたか、なぜその案か、代替案を退けた理由 |
 | 優先軸 | v1整合、安全性、単純性、可逆性、監査可能性のどれを優先したか |
 | 影響範囲 | テーブル、カラム、index、policy、function、RPC、Data Access、UI |
 | RLS/policy matrix | role、操作、`USING`、`WITH CHECK`、拒否条件 |

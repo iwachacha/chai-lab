@@ -21,10 +21,9 @@ v1は、公開レシピサービスやSNSではなく、非公開の個人研究
 | [docs/screen-acceptance-criteria.md](docs/screen-acceptance-criteria.md) | 画面別受け入れ基準。 |
 | [docs/deployment-contract.md](docs/deployment-contract.md) | Cloudflare PagesとNext.js静的出力のデプロイ契約。 |
 | [docs/codex-execution-rules.md](docs/codex-execution-rules.md) | Codex / AIエージェントによる実装ルール。 |
-| [docs/implementation-plan-v1-revised.md](docs/implementation-plan-v1-revised.md) | v1実装計画の改訂版。 |
-| [docs/m0-readiness-gate-reframed.md](docs/m0-readiness-gate-reframed.md) | M0をAI準備完了ゲートとして再定義した最新版。 |
-| [docs/m0-open-questions-reframed.md](docs/m0-open-questions-reframed.md) | M0論点Q-01〜Q-10を4分類で再整理した最新版。 |
-| [docs/governance-refactor-plan.md](docs/governance-refactor-plan.md) | 旧ガバナンス文書から新モデルへの改訂計画。 |
+| [docs/implementation-plan-v1.md](docs/implementation-plan-v1.md) | v1実装計画。 |
+| [docs/m0-readiness-gate.md](docs/m0-readiness-gate.md) | M0のAI準備完了ゲート。 |
+| [docs/m0-decision-matrix.md](docs/m0-decision-matrix.md) | M0論点Q-01〜Q-10の決定表。 |
 
 ## 実装前の原則
 
