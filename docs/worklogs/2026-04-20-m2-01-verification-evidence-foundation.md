@@ -4,6 +4,7 @@
 
 - 作業名: M2-01 検証/証跡土台整理
 - 対象単位: M2-01 reusable non-production DB verification foundation
+- N/Aにした検証観点と理由: なし。M2-01自体は検証土台の固定であり、個別sliceのtrim / deleted / direct CRUD適用可否は後続sliceでN/A判断する
 - 日付: 2026-04-20
 - 変更分類: Docs / DB / RLS / Test
 - 完了運用分類: 軽微変更
@@ -48,7 +49,7 @@
 ## 停止条件
 
 - AI自己監査結果: M2-01の土台整理として通過。以後のsliceで、対象単位、参照SQL、未実施理由、残リスク、次に止める条件を必須証跡にした。
-- 残る停止条件: 実DB変更未着手、非本番検証環境未固定、A/B/anonの実行方法未実証、実migration未作成。
+- 残る停止条件: 実DB変更未着手、非本番検証環境未固定、A/B/anonの実行方法未実証、actor切替方法未固定、実migration未作成。
 - 次に止める条件: 実sliceでN/A理由なしに検証観点を飛ばす、`supabase/verification/` のテンプレートを参照せず記録項目が欠ける、補助証跡と正式証跡の紐付けがない。
 
 ## 完了判断

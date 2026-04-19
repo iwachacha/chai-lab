@@ -3,12 +3,15 @@
 ## 対象
 
 - 作業名: M2-00 DB変更分割計画レビュー
+- 対象単位: M2-00 DB change split review
+- N/Aにした検証観点と理由: なし。M2-00は実検証の実施ではなく、M2-01以降で使う検証観点と停止条件の分割レビュー自体が対象
 - 日付: 2026-04-20
 - 変更分類: Docs / DB / RLS / Test / Data Access
 - 完了運用分類: 軽微変更
 - 分類理由: 実装コード、migration、実環境接続は変更しておらず、M2の危険領域へ入る前の分割計画、停止条件、証跡方針の文書化に限定したため。
 - 適用フェーズ / 適用範囲: v1 M2-00
 - 変更対象: `docs/implementation-plan-v1.md`, `docs/worklogs/2026-04-20-m2-00-db-change-split-review.md`
+- 参照したSQL / 手順書 / 証跡ファイル: `docs/implementation-plan-v1.md`, `docs/db-migration-rls-policy.md`, `docs/supabase-data-access-error-contract.md`, `docs/templates/worklog.md`
 - 危険変更workflow該当: あり。対象はM2のDB/RLS/RPC危険変更計画レビューであり、実DB変更そのものは未着手
 - 人間確認: 不要。実Supabase project、Production URL、secret、Preview/Production接続、本番deployには触れていない
 
@@ -47,7 +50,7 @@
 ## 停止条件
 
 - AI自己監査結果: 計画レビューとして通過。実装前に、M2-01の検証/証跡土台、M2-02の`research_lines`閉単位、M2-09の横断検証、M2-11の自己監査記録を必須ゲートにした。
-- 残る停止条件: 実DB変更未着手、非本番検証未実施、`supabase/` migration基盤未作成、A/B/anon/direct CRUDの実検証未実施。
+- 残る停止条件: 実DB変更未着手、非本番検証未実施、`supabase/` migration基盤未作成、A/B/anon/direct CRUDの実検証未実施、actor A/B/anonの切替方法未固定。
 - 次に止める条件: `research_lines` をDDLだけで完了扱いにする案、`trials` / `trial_ingredients` のdirect CRUD拒否をgrepだけで済ませる案、`deleted_at` 除外をData Accessだけに寄せる案、RPCをM2でまとめて着手する案。
 
 ## 完了判断
