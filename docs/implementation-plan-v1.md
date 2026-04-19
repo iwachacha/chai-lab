@@ -211,10 +211,10 @@ AIは次を確認する。
 ### M2: DB/RLS基盤 + 研究ライン
 
 - 目的: v1の4業務テーブルを安全に作り、RLS、権限、直接CRUD可否、A/B分離を検証したうえで研究ライン機能へ接続する。
-- 実施範囲: DDL、index、helper、RLS enable、policy、grant/revoke、4テーブル検証、研究ラインData Access、L1/L2最小UI。
+- 実施範囲: 検証/証跡土台、`research_lines` 先行の縦切りDB変更、`trials` / `trial_ingredients` / `trial_stars` の段階的DDL/RLS/権限整理、4テーブル横断検証、研究ラインData Access、L1/L2最小UI。
 - 着手条件: M0のSupabase検証環境、RLS/RPC検証方式、AI自己監査手順が確定済み。M1のAuth基盤が動作している。
 - 完了条件: 4業務テーブルすべてでRLS有効化、policy、grant/revoke、想定外直接CRUD拒否、ユーザーA/B分離、anon拒否が検証済みである。研究ラインの作成/編集/アーカイブ/一覧が本人データだけで動作し、L1に試行数と最終試行日を表示する方針が実装準備済みである。
-- 次へ進む条件: M2-10とM2-11のDB/RLS AI自己監査ゲート通過。未通過ならM3に進まない。
+- 次へ進む条件: M2-10の4テーブル横断検証、M2-11のDB/RLS AI自己監査、M2-12の研究ラインData Access、M2-13のL1/L2研究ラインUIが完了している。未通過ならM3に進まない。
 - 自己監査要否: 必須。
 - 主なリスク: 巨大migration、RLS未検証、`trials` / `trial_ingredients` の直接書き込み余地。
 - スコープ逸脱防止メモ: 公開カラム、写真テーブル、比較/系譜/カスタム項目用テーブルを作らない。
@@ -346,7 +346,7 @@ AIは次を確認する。
 - 具体作業: SQLテスト、Supabase local、手動検証、CI対象の区分、A/Bユーザー作成、検証結果保存先を決める。
 - 自己監査要否: 必須
 - テスト/検証内容: RLS有効化、policy、grant、direct CRUD可否、A/B分離、anon拒否の検証項目を固定する。
-- 完了条件: Q-02が解消され、M2-09の検証が実行可能である。
+- 完了条件: Q-02が解消され、M2-01の検証/証跡土台が実行可能である。
 - 次タスクへ渡す成果物: RLS/RPC検証手順
 - 想定リスク: M7までRLS検証が後送りになる
 - スコープ逸脱防止メモ: 検証のために本番UIへテスト導線を入れない。
@@ -463,197 +463,197 @@ AIは次を確認する。
 #### M2-00 DB変更分割計画レビュー
 
 - 優先度/サイズ: P0 / S
-- 目的: M2のDB変更を巨大migrationにしない。
+- 目的: M2のDB変更を巨大migrationにせず、変更単位、検証単位、停止条件、証跡単位を揃える。
 - 対応レイヤー: DB / RLS / Docs
-- 参照文書: db-migration-rls-policy、agent-relationship-governance
+- 参照文書: db-migration-rls-policy、agent-relationship-governance、supabase-data-access-error-contract
 - 着手条件: M0-04、M0-05完了
-- 具体作業: DDL、index、helper、RLS enable、policy、grant/revoke、検証を別タスク/別論理変更に分け、レビュー順を決める。
+- 具体作業: DDL、index/constraint、helper、RLS enable、policy、grant/revoke、検証、Data Accessの依存関係を並べ、最初の実装単位を `research_lines` の閉じたDB sliceとして固定する。
 - 自己監査要否: 必須
-- テスト/検証内容: 各migrationが1論理変更であることを確認する。
-- 完了条件: M2-01からM2-10の順序とレビュー対象が自己監査通過済み。
+- テスト/検証内容: 各migrationが1論理変更であること、単位ごとに完了条件と停止条件があることを確認する。
+- 完了条件: M2-01からM2-13の順序、依存関係、検証、証跡方針が自己監査通過済みである。
 - 次タスクへ渡す成果物: DB変更分割計画
 - 想定リスク: 4テーブル、helper、policy、grantの混在
 - スコープ逸脱防止メモ: v1許可4テーブル以外を計画に入れない。
 
-#### M2-01 `research_lines` DDL
+#### M2-01 検証/証跡土台整理
 
 - 優先度/サイズ: P0 / S
-- 目的: 研究ラインテーブルを最小DDLで作る。
-- 対応レイヤー: DB
-- 参照文書: app-lld、db-migration-rls-policy
+- 目的: DB変更を始める前に、非本番の検証手順と正式証跡項目を先に固定する。
+- 対応レイヤー: DB / RLS / Test / Docs
+- 参照文書: db-migration-rls-policy、agent-workflow、templates/worklog
 - 着手条件: M2-00自己監査通過
-- 具体作業: 必要カラム、所有者、アーカイブ、作成/更新時刻を定義する。公開/共有/写真/AI/比較用カラムを入れない。
+- 具体作業: A/Bユーザー分離、anon拒否、trim制約、論理削除後の通常取得除外、direct CRUD拒否、想定経路成功を確認するSQLまたは手順、記録項目、未実施時の止め方を定義する。
 - 自己監査要否: 必須
-- テスト/検証内容: DDL差分、先回りカラムなし、owner列の存在を確認する。
-- 完了条件: DDLのみのmigrationがレビュー通過。
-- 次タスクへ渡す成果物: `research_lines` table
-- 想定リスク: uniqueやpolicyを同一migrationに混ぜる
-- スコープ逸脱防止メモ: 公開状態カラムを作らない。
+- テスト/検証内容: `research_lines` の初回sliceで必要な検証と証跡が再実行可能であることを確認する。
+- 完了条件: M2-02以降で使う検証チェックリストとworklog記録項目が固定されている。
+- 次タスクへ渡す成果物: 検証/証跡チェックリスト
+- 想定リスク: DDL先行で検証項目が後追いになる
+- スコープ逸脱防止メモ: 実Supabase接続や本番向け設定を始めない。
 
-#### M2-02 `trials` DDL
+#### M2-02 `research_lines` end-to-end DB slice
 
 - 優先度/サイズ: P0 / S
-- 目的: 試行本体テーブルを最小DDLで作る。
+- 目的: M2で最初に閉じるDB実装単位として、`research_lines` をDDLから検証まで一気に閉じる。
+- 対応レイヤー: DB / RLS / Test
+- 参照文書: app-lld、db-migration-rls-policy、supabase-data-access-error-contract
+- 着手条件: M2-01完了
+- 具体作業: table DDL、trim保存制約、未アーカイブ一意制約、RLS enable、本人select/insert/update policy、delete非許可、anon/authenticated grant/revoke、trim重複とarchive後挙動の検証を1単位として扱う。
+- 自己監査要否: 必須
+- テスト/検証内容: trim保存、trim後重複禁止、archive後の重複再利用、A/B分離、anon拒否、physical delete不可を確認する。
+- 完了条件: DDL、index/constraint、RLS、policy、grant/revoke、検証結果が1つの閉じた実装単位としてレビュー通過している。DDLだけでは完了扱いにしない。
+- 次タスクへ渡す成果物: `research_lines` safe slice
+- 想定リスク: tableだけ作ってRLSやuniqueを後送りにする
+- スコープ逸脱防止メモ: 試行数/最終試行日集計やUI接続はまだ完了扱いにしない。
+
+#### M2-03 `trials` DDL
+
+- 優先度/サイズ: P0 / S
+- 目的: `trials` の本体構造を、後続のhelper/RLS/RPCが読める最小DDLで定義する。
 - 対応レイヤー: DB
 - 参照文書: app-lld、mvp-scope-contract
-- 着手条件: M2-01完了
-- 具体作業: 研究ライン参照、親試行参照、`deleted_at`、`brewed_at`、試行メモ/評価項目をv1範囲で定義する。
+- 着手条件: M2-02完了
+- 具体作業: 研究ライン参照、親試行参照、`deleted_at`、`brewed_at`、評価、メモ、次回の狙いをv1範囲で定義し、将来機能カラムを入れない。
 - 自己監査要否: 必須
-- テスト/検証内容: 写真、公開、比較、系譜グラフ専用、カスタム項目用カラムがないことを確認する。
+- テスト/検証内容: `deleted_at` と `parent_trial_id` を含むDDL差分、先回りカラムなし、親参照と研究ライン参照がv1範囲に収まることを確認する。
 - 完了条件: DDLのみのmigrationがレビュー通過。
 - 次タスクへ渡す成果物: `trials` table
-- 想定リスク: 将来機能用カラム追加
-- スコープ逸脱防止メモ: trial保存ロジックはまだ作らない。
+- 想定リスク: 論理削除責務と保存経路責務が混ざる
+- スコープ逸脱防止メモ: 書き込み経路やRLS/policyを同じmigrationに混ぜない。
 
-#### M2-03 `trial_ingredients` DDL
-
-- 優先度/サイズ: P0 / S
-- 目的: 材料行テーブルを最小DDLで作る。
-- 対応レイヤー: DB
-- 参照文書: app-lld
-- 着手条件: M2-02完了
-- 具体作業: 親trial、材料名、量、単位、順序を定義する。
-- 自己監査要否: 必須
-- テスト/検証内容: 材料マスター、プリセット、スパイスブレンド用構造がないことを確認する。
-- 完了条件: DDLのみのmigrationがレビュー通過。
-- 次タスクへ渡す成果物: `trial_ingredients` table
-- 想定リスク: 将来の材料辞書を先回りする
-- スコープ逸脱防止メモ: 材料行保存はRPCまで直接実装しない。
-
-#### M2-04 `trial_stars` DDL
-
-- 優先度/サイズ: P0 / S
-- 目的: スター状態をv1最小範囲で扱う。
-- 対応レイヤー: DB
-- 参照文書: app-lld、mvp-scope-contract
-- 着手条件: M2-03完了
-- 具体作業: userとtrialの組み合わせ、作成時刻、重複防止を定義する。
-- 自己監査要否: 必須
-- テスト/検証内容: お気に入り棚、定番昇格、リアクション用構造がないことを確認する。
-- 完了条件: DDLのみのmigrationがレビュー通過。
-- 次タスクへ渡す成果物: `trial_stars` table
-- 想定リスク: SNSリアクションへ拡張する
-- スコープ逸脱防止メモ: スターは本人の印だけに限定する。
-
-#### M2-05 Index/constraint migration
+#### M2-04 Helper/View/Enum等の補助要素
 
 - 優先度/サイズ: P0 / M
-- 目的: v1検索と整合性に必要なindex/constraintをDDL本体から分ける。
-- 対応レイヤー: DB
-- 参照文書: app-lld、app-rdd、db-migration-rls-policy
-- 着手条件: M2-01からM2-04完了、Q-04の方針が必要な範囲で決定済み
-- 具体作業: user/line/date/star取得、未削除一覧、active research line重複、親参照に必要なindex/constraintを定義する。
-- 自己監査要否: 必須
-- テスト/検証内容: 1000件程度の履歴取得に必要なindex観点を確認する。
-- 完了条件: index/constraintだけのmigrationがレビュー通過。
-- 次タスクへ渡す成果物: index/constraint
-- 想定リスク: 正規化未決定のままuniqueを固定する
-- スコープ逸脱防止メモ: 検索便利機能や集計用indexを過剰に作らない。
-
-#### M2-06 Helper/View/Enum等の補助要素
-
-- 優先度/サイズ: P0 / M
-- 目的: RLSとRPCで使う最小helperを分離して作る。
+- 目的: `trials` / `trial_ingredients` / `trial_stars` のRLSと後続RPCで使う最小helperだけを先に閉じる。
 - 対応レイヤー: DB / RLS
 - 参照文書: app-lld、db-migration-rls-policy
-- 着手条件: M2-05完了
-- 具体作業: 所有者確認helper、active line/trial確認helperなど必要最小限を定義し、`security definer` を使う場合はsearch_path固定、PUBLIC revoke、authenticated grantを明記する。
+- 着手条件: M2-03完了
+- 具体作業: active line/trial所有者確認helperなど必要最小限を定義し、`security definer` を使う場合は `search_path` 固定、`auth.uid()`、PUBLIC revoke、必要roleへのgrantを明記する。
 - 自己監査要否: 必須
-- テスト/検証内容: A/B所有者確認、deleted/archivedの扱い、PUBLIC実行不可を確認する。
-- 完了条件: helperの権限と動作がレビュー通過。
+- テスト/検証内容: A/B所有者確認、archived/deletedの扱い、PUBLIC実行不可を確認する。
+- 完了条件: helperの権限と動作がレビュー通過し、RLS/RPCの前提として再利用可能である。
 - 次タスクへ渡す成果物: helper set
 - 想定リスク: helperが広すぎてRLSを迂回する
-- スコープ逸脱防止メモ: 将来機能向けhelperを作らない。
+- スコープ逸脱防止メモ: 将来機能向けhelperやviewを作らない。
 
-#### M2-07 RLS有効化
-
-- 優先度/サイズ: P0 / S
-- 目的: 4業務テーブルすべてでRLSを有効にする。
-- 対応レイヤー: RLS
-- 参照文書: db-migration-rls-policy、mvp-scope-contract
-- 着手条件: M2-06完了
-- 具体作業: `research_lines`、`trials`、`trial_ingredients`、`trial_stars` のRLS有効化を行う。
-- 自己監査要否: 必須
-- テスト/検証内容: 各テーブルでRLSが有効であることを検証手順で確認する。
-- 完了条件: 4テーブルすべてRLS有効化済み。
-- 次タスクへ渡す成果物: RLS enabled tables
-- 想定リスク: 1テーブルだけ有効化漏れ
-- スコープ逸脱防止メモ: authなし公開policyを作らない。
-
-#### M2-08 Policy定義
-
-- 優先度/サイズ: P0 / L
-- 目的: テーブル別に許可操作と拒否操作を明示する。
-- 対応レイヤー: RLS
-- 参照文書: app-lld、db-migration-rls-policy
-- 着手条件: M2-07完了
-- 具体作業: `research_lines` は本人select/insert/updateのみ、delete不可。`trials` は本人selectのみ、insert/update/delete/upsert不可。`trial_ingredients` は親trial本人selectのみ、insert/update/delete/upsert不可。`trial_stars` は本人の未削除trialに対するselect/insert/deleteのみ、update不可。
-- 自己監査要否: 必須
-- テスト/検証内容: `USING` と `WITH CHECK` の意図、他ユーザー拒否、archived/deletedの扱いを確認する。
-- 完了条件: policy matrixがレビュー通過。
-- 次タスクへ渡す成果物: RLS policies
-- 想定リスク: select広すぎ、write許可広すぎ
-- スコープ逸脱防止メモ: 公開閲覧policyを作らない。
-
-#### M2-09 Grant/Revoke整理
+#### M2-05 `trial_ingredients` DDL + core index/constraint
 
 - 優先度/サイズ: P0 / M
-- 目的: anon/authenticatedの権限をpolicy意図と一致させる。
-- 対応レイヤー: DB / RLS
-- 参照文書: db-migration-rls-policy、deployment-contract
-- 着手条件: M2-08完了
-- 具体作業: anonの業務テーブルアクセス拒否、authenticatedの許可範囲、helper/RPC実行権限、PUBLIC revokeを整理する。
+- 目的: 材料行の構造を `trials` 依存の最小範囲に固定し、親参照と取得順だけを先に閉じる。
+- 対応レイヤー: DB
+- 参照文書: app-lld、db-migration-rls-policy
+- 着手条件: M2-04完了
+- 具体作業: 親trial、材料名、量、単位、投入タイミング、順序、親trial取得に必要なindex/constraintを定義する。
 - 自己監査要否: 必須
-- テスト/検証内容: anon拒否、authenticatedの想定外操作拒否、PUBLIC実行不可を確認する。
-- 完了条件: grant/revoke matrixがレビュー通過。
-- 次タスクへ渡す成果物: 権限設定
-- 想定リスク: PUBLICに広く実行権限が残る
-- スコープ逸脱防止メモ: service_role前提のブラウザ処理を作らない。
+- テスト/検証内容: 材料マスター、プリセット、スパイスブレンド用構造がないこと、親trial参照だけで取得順が決められることを確認する。
+- 完了条件: DDLと取得に必要な最小index/constraintだけのmigrationがレビュー通過する。
+- 次タスクへ渡す成果物: `trial_ingredients` table
+- 想定リスク: 将来の材料辞書や保存経路を先回りする
+- スコープ逸脱防止メモ: 材料行保存はM3のRPCまで実装しない。
 
-#### M2-10 4テーブルRLS/権限/直接CRUD検証
+#### M2-06 `trials` / `trial_ingredients` read RLS/policy
+
+- 優先度/サイズ: P0 / M
+- 目的: `trials` と `trial_ingredients` の通常取得を、本人かつ未削除試行だけに限定する。
+- 対応レイヤー: RLS
+- 参照文書: app-lld、db-migration-rls-policy、supabase-data-access-error-contract
+- 着手条件: M2-05完了
+- 具体作業: `trials` は `user_id = auth.uid()` かつ `deleted_at IS NULL` のselectのみ、`trial_ingredients` は親trial本人かつ親trial未削除だけのselectに限定する。insert/update/delete/upsert policyは作らない。
+- 自己監査要否: 必須
+- テスト/検証内容: `USING` の意図、deleted試行の通常取得除外、親trial経由の所有者確認を確認する。
+- 完了条件: read pathのRLS/policyがレビュー通過し、通常取得で削除済み試行や他ユーザーの行が返らない前提が固まっている。
+- 次タスクへ渡す成果物: trials/ingredients read policies
+- 想定リスク: deleted_at除外がData Accessだけに依存する
+- スコープ逸脱防止メモ: 復旧・監査用の別経路をv1アプリ向けpolicyに混ぜない。
+
+#### M2-07 `trials` / `trial_ingredients` grant/revoke + direct CRUD拒否
+
+- 優先度/サイズ: P0 / S
+- 目的: `trials` と `trial_ingredients` の直接書き込みをDB権限で塞ぎ、M3のRPCだけが将来の書き込み経路になる前提を作る。
+- 対応レイヤー: DB / RLS / Test
+- 参照文書: db-migration-rls-policy、codex-execution-rules、supabase-data-access-error-contract
+- 着手条件: M2-06完了
+- 具体作業: anonの拒否、authenticatedのselect限定、helper/PUBLIC実行権限の整理、`trials` / `trial_ingredients` の insert/update/delete/upsert をDB grant/revokeで拒否する。機械検索は補助確認として併用する。
+- 自己監査要否: 必須
+- テスト/検証内容: anon拒否、authenticatedの直接write拒否、機械検索で直書き経路なし、grepだけでは完了扱いにしないことを確認する。
+- 完了条件: direct CRUD拒否がgrant/revoke、policy、不在のwrite path、機械検索の4点で説明できる。
+- 次タスクへ渡す成果物: trials/ingredients deny-write boundary
+- 想定リスク: grepだけ通ってDB権限が開いたままになる
+- スコープ逸脱防止メモ: save系RPCをこの段階で追加しない。
+
+#### M2-08 `trial_stars` end-to-end DB slice
 
 - 優先度/サイズ: P0 / L
-- 目的: M2内で全4業務テーブルの安全性を実行確認する。
-- 対応レイヤー: RLS / DB / Test
-- 参照文書: db-migration-rls-policy、codex-execution-rules、agent-relationship-governance
-- 着手条件: M2-09完了
-- 具体作業: 4テーブルそれぞれでRLS有効化、policy、grant/revoke、anon拒否、ユーザーA/B分離、想定外直接CRUD拒否、想定経路の成功を検証する。
+- 目的: `trial_stars` を、本人の未削除試行にだけ付与できる最小範囲で閉じる。
+- 対応レイヤー: DB / RLS / Test
+- 参照文書: app-lld、db-migration-rls-policy、supabase-data-access-error-contract
+- 着手条件: M2-07完了
+- 具体作業: table DDL、複合主キー、RLS enable、本人の未削除trialだけに対する select/insert/delete policy、grant/revoke、deleted試行と他ユーザー試行への付与拒否を1単位として扱う。
 - 自己監査要否: 必須
-- テスト/検証内容: `research_lines` はAが自分だけ作成/編集でき、Bの行参照/更新/削除不可。`trials` はAが自分のselectのみ可能でinsert/update/delete/upsert不可。`trial_ingredients` は親trial所有者だけselect可能で直接write不可。`trial_stars` は本人の未削除trialだけinsert/delete可能でBのtrialや削除済みtrialは拒否。全テーブルでanon拒否。
-- 完了条件: 検証結果が作業記録にあり、失敗がない。未実施があればM2未完了。
-- 次タスクへ渡す成果物: RLS/権限検証結果
-- 想定リスク: M7までRLS不備を見逃す
-- スコープ逸脱防止メモ: 検証のためにpolicyを緩めない。
+- テスト/検証内容: 本人未削除trialだけselect/insert/delete可、他ユーザーtrial拒否、deleted trial拒否、anon拒否を確認する。
+- 完了条件: DDL、policy、grant/revoke、検証結果が1つの閉じた単位としてレビュー通過している。
+- 次タスクへ渡す成果物: `trial_stars` safe slice
+- 想定リスク: deleted trialのスターが通常取得に漏れる
+- スコープ逸脱防止メモ: お気に入り棚、定番昇格、SNSリアクションへ広げない。
+
+#### M2-09 4テーブル横断検証
+
+- 優先度/サイズ: P0 / M
+- 目的: 単位別に閉じた変更が、4テーブル横断でも崩れていないことを確認する。
+- 対応レイヤー: DB / RLS / Test
+- 参照文書: db-migration-rls-policy、codex-execution-rules、agent-relationship-governance
+- 着手条件: M2-08完了
+- 具体作業: `research_lines`、`trials`、`trial_ingredients`、`trial_stars` それぞれでA/B分離、anon拒否、trim制約、deleted通常取得除外、direct CRUD拒否、想定経路成功を横断確認する。
+- 自己監査要否: 必須
+- テスト/検証内容: `research_lines` のtrim/重複/archive、`trials` と `trial_stars` のdeleted通常取得除外、`trials` / `trial_ingredients` direct CRUD拒否、全テーブルanon拒否を確認する。
+- 完了条件: 横断検証結果が作業記録にあり、未実施があればM2未完了として止める。
+- 次タスクへ渡す成果物: 4テーブル検証結果
+- 想定リスク: 単体で通った前提が横断時に崩れる
+- スコープ逸脱防止メモ: 検証のためにpolicyやgrantを緩めない。
+
+#### M2-10 研究ラインData Access
+
+- 優先度/サイズ: P0 / M
+- 目的: `research_lines` の取得・作成・編集・アーカイブをUIから分離し、DB制約と同じ条件で扱う。
+- 対応レイヤー: Data Access / ErrorHandling
+- 参照文書: supabase-data-access-error-contract、app-lld
+- 着手条件: M2-09完了、Q-04即時決定済み
+- 具体作業: 一覧、作成、編集、アーカイブ、active line取得を定義し、trim保存、trim後重複、archived_at通常除外、new trial選択用active listをData Access責務へ閉じ込める。
+- 自己監査要否: 認可境界のため必須
+- テスト/検証内容: AUTH_REQUIRED、FORBIDDEN/NOT_FOUND、CONFLICT、NETWORK_ERRORの分類、trim/duplicate挙動、archived lineの通常除外を確認する。
+- 完了条件: UIからSupabaseを直接呼ばず、本人データだけが返り、archived lineの通常除外と例外経路が説明できる。
+- 次タスクへ渡す成果物: Research Line Data Access
+- 想定リスク: DB制約とData Accessのtrim/archive条件がずれる
+- スコープ逸脱防止メモ: 試行保存やtrial系write pathをここで始めない。
 
 #### M2-11 DB/RLS AI自己監査ゲート通過
 
 - 優先度/サイズ: P0 / S
-- 目的: M2のDB/RLS変更をAI自己監査で閉じる。
+- 目的: M2のDB/RLS変更を、単位ごとの検証結果と停止条件を含めてAI自己監査で閉じる。
 - 対応レイヤー: DB / RLS / Docs
 - 参照文書: db-migration-rls-policy、agent-relationship-governance
 - 着手条件: M2-10完了
-- 具体作業: DDL、index、helper、policy、grant/revoke、検証結果、direct CRUD検索結果、スコープ検索結果を自己監査資料にまとめる。
+- 具体作業: DDL、index/constraint、helper、policy、grant/revoke、検証結果、direct CRUD検索結果、未実施検証、残リスク、次に止める条件を自己監査資料にまとめる。
 - 自己監査要否: 必須
-- テスト/検証内容: reviewerがM2-10結果と禁止要素なしを確認する。
-- 完了条件: 自己監査記録が残る。監査未通過ならM3へ進まない。
+- テスト/検証内容: reviewerがM2-09結果、M2-10のData Access境界、禁止要素なしを確認する。
+- 完了条件: 自己監査記録が残る。監査未通過ならM2-12以降もM3も進めない。
 - 次タスクへ渡す成果物: M2自己監査記録
 - 想定リスク: DB事故の未レビュー通過
 - スコープ逸脱防止メモ: 「自己監査予定」で完了にしない。
 
-#### M2-12 研究ラインData Access
+#### M2-12 研究ライン集計付きData Access
 
 - 優先度/サイズ: P0 / M
-- 目的: 研究ライン操作をData Access層に閉じ込める。
+- 目的: L1/L2で必要な集計付き研究ライン取得を、M2のDB前提と矛盾しない形で閉じる。
 - 対応レイヤー: Data Access / ErrorHandling
-- 参照文書: supabase-data-access-error-contract、app-lld
-- 着手条件: M2-11完了、Q-04即時決定済み
-- 具体作業: 一覧、作成、編集、アーカイブ、active line取得、L1の試行数/最終試行日用取得を定義する。
+- 参照文書: supabase-data-access-error-contract、app-lld、screen-acceptance-criteria
+- 着手条件: M2-11完了
+- 具体作業: L1向けの試行数/最終試行日取得を追加し、`trials.deleted_at IS NULL` を通常取得条件に含め、archived lineは通常一覧とnew trial選択から除外する。
 - 自己監査要否: 認可境界のため必須
-- テスト/検証内容: AUTH_REQUIRED、FORBIDDEN/NOT_FOUND、CONFLICT、NETWORK_ERRORの分類を確認する。
-- 完了条件: UIからSupabaseを直接呼ばず、本人データだけが返る。
-- 次タスクへ渡す成果物: Research Line Data Access
-- 想定リスク: アーカイブ済みlineを新規試行選択に出す
-- スコープ逸脱防止メモ: 公開/フォロー/投稿数概念を入れない。
+- テスト/検証内容: deleted trial除外、archived line除外、AUTH_REQUIRED、FORBIDDEN/NOT_FOUND、NETWORK_ERRORの分類を確認する。
+- 完了条件: 集計付きResearch Line Data Accessが本人の未削除trialだけを前提に成立する。
+- 次タスクへ渡す成果物: L1/L2向けResearch Line Data Access
+- 想定リスク: deleted trialが集計に混ざる
+- スコープ逸脱防止メモ: trial詳細や履歴のData Accessを先回りしない。
 
 #### M2-13 L1/L2研究ラインUI
 
