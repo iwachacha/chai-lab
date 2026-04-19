@@ -50,7 +50,7 @@ export default nextConfig;
 - `/trials/detail?id=<trial_id>`
 - `/research-lines/detail?id=<research_line_id>`
 - `/trials/edit?id=<trial_id>`
-- `/auth/callback`
+- `/auth/callback/`
 
 IDを含む画面は、静的ページを表示した後、クライアント側でクエリパラメータを読み取り、Supabaseから本人データを取得する。存在しないID、他ユーザーのID、論理削除済みIDは、内部IDを出さずに表示不可状態にする。
 
@@ -99,11 +99,24 @@ Magic Linkのリダイレクト先は静的ページとして用意する。
 
 `/auth/callback/` はブラウザ上でSupabaseセッションを確定し、認証成功後にホームへ遷移する。サーバー側callbackは作らない。
 
+Auth Callback実装では、実装方式の揺れによる認証事故を避けるため、次を満たす。
+
+1. URLクエリの `code` がある場合は、ブラウザ上でSupabase Clientのセッション交換処理を行う。
+2. URL fragmentに `access_token`、`refresh_token`、`error` などが含まれる場合も、ブラウザ上でセッション確定または失敗表示に正規化する。
+3. `error`、`error_description`、`error_code` がある場合は、Supabaseの生エラーやtokenを表示せず、ユーザー向けの再ログイン導線を表示する。
+4. セッション確定後、`code`、token、error情報をURLに残さない。`history.replaceState` などでcallback URLを掃除してから、ホームまたは許可済みの内部遷移先へ移動する。
+5. 遷移先指定を扱う場合は、アプリ内の固定ルートだけを許可し、外部URLや任意URLへのopen redirectを許可しない。
+6. 認証処理中はローディング状態を表示し、失敗時は認証画面へ戻れる導線を残す。
+
+成功時の既定遷移先はホームとする。初回ログイン後に研究ラインがない場合の研究ライン作成誘導は、callbackページではなくホームまたは認証後ガード側で判定する。
+
 ## 7. Preview環境
 
 Preview環境を使う場合は、Productionとは別のSupabaseプロジェクトまたは明確に分離されたテストデータを使用する。ProductionデータをPreview UIの検証に使わない。
 
-Preview環境でMagic Linkを確認する場合は、Supabase Authの許可リダイレクトURLにPreview URLを追加する。設定追加はPRまたは作業記録に残す。
+Preview環境でMagic Linkを確認する場合は、Supabase Authの許可リダイレクトURLに対象Previewの `/auth/callback/` を追加する。設定追加はPRまたは作業記録に残す。
+
+Production用Supabaseプロジェクトには、Preview URLや広すぎるワイルドカードを安易に登録しない。Preview確認が必要な場合は、分離されたPreview用SupabaseプロジェクトにPreview URLを登録することを基本とする。Production URLを登録または変更する直前だけ、依頼者への限定的人間確認を行う。
 
 ## 8. デプロイ前チェック
 

@@ -16,7 +16,7 @@ M2以降のDB/RLS/RPCへ進む場合は、AI自己監査ゲートを満たす。
 | ゲートID | 新しいゲート名 | AIの決定 | AI自己監査の完了条件 | 人間確認 | 未完了時に止める範囲 |
 |---|---|---|---|---|---|
 | G0-ENV | 環境分離準備 | localはSupabase localまたは非本番project、previewはproductionと分離、productionデータをpreviewで使わない。M1ではenv名と禁止値チェックを先に作る。 | `NEXT_PUBLIC_*` 以外をブラウザに置かない方針、production参照禁止、local-onlyで進める範囲が記録済み。 | 実Supabase project、Production URL、secret、Preview/Production接続を設定する直前だけ必要。 | 実環境接続、Preview E2E、M8 deploy。M1骨格は止めない。 |
-| G0-AUTH | Auth Redirect準備 | Auth Callbackは `/auth/callback/` の静的ページ。サーバーcallback、SSR、API Routesは作らない。 | local/preview/productionすべてで `/auth/callback/` を使う前提、未確定URLの扱い、静的export制約が記録済み。 | 実URL登録時だけ必要。 | 実Magic Link疎通、M8 Auth確認。M1のcallback実装は止めない。 |
+| G0-AUTH | Auth Redirect準備 | Auth Callbackは `/auth/callback/` の静的ページ。query codeとURL fragmentの両方をブラウザ上で処理し、成功/失敗後にURL上のtoken、code、error情報を残さない。サーバーcallback、SSR、API Routesは作らない。 | local/preview/productionすべてで `/auth/callback/` を使う前提、未確定URLの扱い、静的export制約、失敗時の再ログイン導線が記録済み。 | 実URL登録時だけ必要。 | 実Magic Link疎通、M8 Auth確認。M1のcallback実装は止めない。 |
 | G0-RLS-VERIFY | RLS/RPC検証方式 | M2では再実行可能なSQLまたはSupabase local手順とチェックリストで検証し、M7で再実行する。 | A/B分離、anon拒否、direct CRUD拒否、grant/revoke、RPC重要仕様の最低検証項目が定義済み。 | 不要。検証方式はAIが決める。 | M2 DB/RLS、M3/M4 RPC。 |
 | G0-AUDIT | AI自己監査ゲート | 危険領域では設計、影響範囲、権限、代替案、検証、記録をAIが完了条件として満たす。 | 対象変更、事前資料、監査観点、通過条件、差し戻し時の停止範囲が記録済み。 | 不要。人間承認者名は不要。 | DB/RLS/RPC/security definer、認可境界Data Access。 |
 | G0-DOMAIN | 未確定仕様のAI分類 | Q-04/Q-06/Q-09/Q-10は即決、Q-05/Q-07は安全側の仮決定、Q-08はM8保留、Q-01だけ限定的人間確認。 | `docs/m0-decision-matrix.md` に分類、採用方針、優先軸、リスク、停止範囲が記録済み。 | Q-01の実環境、Q-08の本番前backup/exportだけ必要。 | 該当する実環境またはM8 deploy。M1は止めない。 |

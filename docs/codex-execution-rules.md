@@ -161,6 +161,20 @@ Codexは、変更種別に応じて以下を実行または提案する。
 
 実行できなかった検証がある場合は、最終報告で明示する。
 
+### 10.1 機械的停止チェック
+
+実装コードが存在する段階では、Codexは自己監査の宣言だけで完了扱いにしない。変更完了前に、該当範囲へ次のような機械的チェックを実行し、検出があれば内容を確認する。検出がv1スコープ逸脱、secret混入、direct CRUD、静的export制約違反に該当する場合は、そのまま完了してはならない。
+
+```bash
+rg -n -g "!docs/**" -g "!README.md" "SUPABASE_SERVICE_ROLE_KEY|service_role|DB_CONNECTION|DATABASE_URL|OPENAI_API_KEY|R2_|STORAGE_" .
+rg -n -g "!docs/**" -g "!README.md" "from\\(['\"]trials['\"]\\)\\.(insert|update|upsert|delete)|from\\(['\"]trial_ingredients['\"]\\)\\.(insert|update|upsert|delete)" .
+rg --files -g "!docs/**" -g "!README.md" | rg "(^|/)(pages/api|app/api|functions)(/|$)"
+rg --files -g "!docs/**" -g "!README.md" | rg "\\[[^/]+\\]"
+rg -n -g "!docs/**" -g "!README.md" "public_slug|share_token|visibility|follow|comment|reaction|photo|storage|AI提案|compare|graph" .
+```
+
+上記は最低限の事故検出であり、唯一のテストではない。docs-only状態や対象ファイルが未作成で実行できない場合は、未実施理由として記録する。誤検出がある場合も、なぜv1違反ではないかを最終報告または作業記録に残す。
+
 ## 11. ドキュメント更新ルール
 
 以下の変更では、実装と同時に文書を更新する。

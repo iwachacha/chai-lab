@@ -78,7 +78,17 @@ v1で許可する業務テーブルは以下に限定する。
 | `research_lines` | `user_id = auth.uid()` | 本人のみ select / insert / update。v1ではdeleteを許可せず、削除UIは `archived_at` 更新とする。 |
 | `trials` | `user_id = auth.uid()` | selectのみ直接許可する。insert / update / delete は `save_trial_with_ingredients`、`clone_trial`、`soft_delete_trial` に集約する。 |
 | `trial_ingredients` | 親 `trials.user_id = auth.uid()` | selectのみ直接許可する。insert / update / delete は試行系RPC内に集約する。 |
-| `trial_stars` | `user_id = auth.uid()` | 本人のスターだけ select / insert / delete。 |
+| `trial_stars` | `user_id = auth.uid()` と対象試行の未削除確認 | 本人の未削除試行に対するスターだけ select / insert / delete。 |
+
+研究ライン名は、v1では前後空白をtrimした保存値を正とする。migrationでは `research_lines.title = btrim(title)` をDB制約で担保し、未アーカイブ研究ラインの一意性は `user_id` とtrim後タイトルの完全一致で判定する。大文字小文字、全角半角、Unicode正規化はv1では同一視しない。
+
+```sql
+CHECK (title = btrim(title) AND char_length(title) BETWEEN 1 AND 80)
+
+CREATE UNIQUE INDEX idx_research_lines_active_title
+  ON research_lines(user_id, btrim(title))
+  WHERE archived_at IS NULL;
+```
 
 ## 4. RLS設計ルール
 
@@ -161,9 +171,9 @@ WITH CHECK (user_id = auth.uid());
 
 ### 4.3 `trials`
 
-`trials` は `user_id` で所有者を判定する。
+`trials` は `user_id` で所有者を判定し、アプリ向けselectでは未削除試行だけを見せる。論理削除済み試行の復旧、監査、将来クリーンアップは通常アプリ経路とは分ける。
 
-- select: `user_id = auth.uid()` かつ通常画面では `deleted_at IS NULL`
+- select: `user_id = auth.uid()` かつ `deleted_at IS NULL`
 - insert: アプリ向けロールには直接許可しない。`save_trial_with_ingredients` または `clone_trial` で行う
 - update: アプリ向けロールには直接許可しない。編集は `save_trial_with_ingredients`、論理削除は `soft_delete_trial` で行う
 - delete: v1では許可しない
@@ -175,14 +185,17 @@ SQL雛形:
 ```sql
 CREATE POLICY trials_select_own
 ON trials FOR SELECT
-USING (user_id = auth.uid());
+USING (
+  user_id = auth.uid()
+  AND deleted_at IS NULL
+);
 ```
 
 ### 4.4 `trial_ingredients`
 
 `trial_ingredients` は自身に `user_id` を持たないため、親 `trials` の所有者で判定する。
 
-- select: 親試行の `user_id = auth.uid()`
+- select: 親試行の `user_id = auth.uid()` かつ親試行が未削除
 - insert: アプリ向けロールには直接許可しない。`save_trial_with_ingredients` または `clone_trial` で行う
 - update: アプリ向けロールには直接許可しない。v1では材料行は試行保存時に全置換する
 - delete: アプリ向けロールには直接許可しない。v1では材料行は試行保存時に全置換する
@@ -203,9 +216,9 @@ USING (
 
 `trial_stars` は `user_id` と `trial_id` の複合主キーで扱う。
 
-- select: `user_id = auth.uid()`
+- select: `user_id = auth.uid()` かつ対象試行が本人の未削除試行
 - insert: `user_id = auth.uid()` かつ対象試行の `user_id = auth.uid()`
-- delete: `user_id = auth.uid()`
+- delete: `user_id = auth.uid()` かつ対象試行が本人の未削除試行
 - update: v1では不要
 
 スターは本人の軽い印であり、他ユーザーと共有しない。
@@ -215,7 +228,10 @@ SQL雛形:
 ```sql
 CREATE POLICY trial_stars_select_own
 ON trial_stars FOR SELECT
-USING (user_id = auth.uid());
+USING (
+  user_id = auth.uid()
+  AND is_own_active_trial(trial_id)
+);
 
 CREATE POLICY trial_stars_insert_own
 ON trial_stars FOR INSERT
@@ -226,7 +242,10 @@ WITH CHECK (
 
 CREATE POLICY trial_stars_delete_own
 ON trial_stars FOR DELETE
-USING (user_id = auth.uid());
+USING (
+  user_id = auth.uid()
+  AND is_own_active_trial(trial_id)
+);
 ```
 
 ### 4.6 アプリ向け権限
@@ -318,11 +337,13 @@ DB変更を含む実装では、最低限以下を確認する。
 | ユーザーAが自分の研究ラインを作成できる | 成功する。 |
 | ユーザーAがユーザーBの研究ラインを取得する | 0件または権限エラーになる。 |
 | ユーザーAがユーザーBの試行を取得する | 0件または権限エラーになる。 |
+| ユーザーAが自分の論理削除済み試行を通常selectする | 0件または表示不可になる。 |
 | ユーザーAがユーザーBの試行に材料行を追加する | 失敗する。 |
 | ユーザーAがRPCを通さずに `trials` を直接insert/updateする | 失敗する。 |
 | ユーザーAがRPCを通さずに `trial_ingredients` を直接insert/update/deleteする | 失敗する。 |
 | ユーザーAがユーザーBの試行を複製する | 失敗する。 |
 | ユーザーAがユーザーBの試行にスターを付ける | 失敗する。 |
+| ユーザーAが論理削除済み試行にスターを付ける、またはスターを通常取得する | 失敗または0件になる。 |
 | 未認証状態で業務テーブルを読む | 失敗する。 |
 | ユーザーAが `research_lines` を物理削除する | 失敗する。 |
 | ユーザーAが `trials` を物理削除する | 失敗する。 |
