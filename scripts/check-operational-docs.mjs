@@ -7,10 +7,10 @@ const failures = [];
 const requiredFiles = [
   "README.md",
   "AGENTS.md",
+  "docs/INDEX.md",
   "docs/agent-relationship-governance.md",
   "docs/agent-workflow.md",
   "docs/codex-execution-rules.md",
-  "docs/agent-relationship-governance-decision.md",
   "docs/templates/worklog.md",
   ".github/pull_request_template.md",
   ".github/workflows/docs.yml",
@@ -18,14 +18,26 @@ const requiredFiles = [
 
 const requiredMentions = [
   ["README.md", "AGENTS.md"],
+  ["README.md", "docs/INDEX.md"],
   ["README.md", "docs/templates/worklog.md"],
   ["README.md", "npm run check:docs"],
+  ["AGENTS.md", "docs/INDEX.md"],
   ["AGENTS.md", "docs/agent-relationship-governance.md"],
   ["AGENTS.md", "docs/agent-workflow.md"],
   ["AGENTS.md", "docs/codex-execution-rules.md"],
   ["AGENTS.md", "docs/templates/worklog.md"],
+  ["docs/INDEX.md", "恒久運用文書"],
+  ["docs/INDEX.md", "現行フェーズ契約"],
+  ["docs/INDEX.md", "判断記録"],
+  ["docs/INDEX.md", "agent-relationship-governance.md"],
+  ["docs/INDEX.md", "mvp-scope-contract.md"],
   ["docs/agent-workflow.md", "docs/templates/worklog.md"],
   [".github/pull_request_template.md", "docs/templates/worklog.md"],
+];
+
+const optionalMentions = [
+  ["docs/agent-relationship-governance-decision.md", "docs/INDEX.md", "agent-relationship-governance-decision.md"],
+  ["docs/m0-decision-matrix.md", "docs/INDEX.md", "m0-decision-matrix.md"],
 ];
 
 function exists(relativePath) {
@@ -66,6 +78,16 @@ for (const [file, mention] of requiredMentions) {
 
   if (!read(file).includes(mention)) {
     failures.push(`${file} must mention ${mention}`);
+  }
+}
+
+for (const [optionalFile, file, mention] of optionalMentions) {
+  if (!exists(optionalFile) || !exists(file)) {
+    continue;
+  }
+
+  if (!read(file).includes(mention)) {
+    failures.push(`${file} must mention optional document ${mention} because ${optionalFile} exists`);
   }
 }
 
