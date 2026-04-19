@@ -35,6 +35,7 @@ supabase/migrations/YYYYMMDDHHMMSS_short_description.sql
 supabase/migrations/20260419090000_create_v1_core_tables.sql
 supabase/migrations/20260419093000_add_save_trial_with_ingredients_rpc.sql
 supabase/migrations/20260419094000_add_clone_trial_rpc.sql
+supabase/migrations/20260419095000_add_soft_delete_trial_rpc.sql
 supabase/migrations/20260419100000_add_v1_rls_policies.sql
 ```
 
@@ -64,16 +65,17 @@ v1では以下を禁止する。
 - `service_role` キーをフロントエンドで使う設計
 - `security definer` 関数で所有者確認を省略すること
 - 既存RLSを一時的に広げてから後で直す進め方
+- 試行本体または材料行を、定義済みRPCを通さずにアプリから直接 insert / update / delete すること
 
 ## 3. v1許可テーブル
 
 v1で許可する業務テーブルは以下に限定する。
 
-| テーブル | 所有者判定 | RLS要件 |
+| テーブル | 所有者判定 | アプリ向け権限 |
 |---|---|---|
-| `research_lines` | `user_id = auth.uid()` | 本人のみ select / insert / update。v1ではdeleteポリシーを作らず、削除UIは `archived_at` 更新とする。 |
-| `trials` | `user_id = auth.uid()` | 本人のみ select / insert / update。v1ではdeleteポリシーを作らず、削除UIは `deleted_at` 更新とする。 |
-| `trial_ingredients` | 親 `trials.user_id = auth.uid()` | 親試行が本人のものだけ select / insert / update / delete。 |
+| `research_lines` | `user_id = auth.uid()` | 本人のみ select / insert / update。v1ではdeleteを許可せず、削除UIは `archived_at` 更新とする。 |
+| `trials` | `user_id = auth.uid()` | selectのみ直接許可する。insert / update / delete は `save_trial_with_ingredients`、`clone_trial`、`soft_delete_trial` に集約する。 |
+| `trial_ingredients` | 親 `trials.user_id = auth.uid()` | selectのみ直接許可する。insert / update / delete は試行系RPC内に集約する。 |
 | `trial_stars` | `user_id = auth.uid()` | 本人のスターだけ select / insert / delete。 |
 
 ## 4. RLS設計ルール
@@ -88,14 +90,14 @@ ALTER TABLE table_name ENABLE ROW LEVEL SECURITY;
 
 `FORCE ROW LEVEL SECURITY` は、運用とテスト方針が固まるまでは必須にしない。ただし、RLSを迂回するアプリケーション経路を作ってはならない。
 
-親レコード所有者の確認は、RLSポリシー内で複雑な自己参照を直接書かず、`security definer` の検証関数に切り出す。検証関数は `auth.uid()` を内部で参照し、`search_path` を固定する。
+親レコード所有者の確認は、RLSポリシー内で複雑な自己参照を直接書かず、`security definer` の検証関数に切り出す。検証関数は `auth.uid()` を内部で参照し、`search_path` を固定する。`security definer` 関数は `PUBLIC` 実行権限を取り消し、必要なロールにだけ `EXECUTE` を付与する。
 
 ```sql
 CREATE FUNCTION is_own_active_research_line(target_id uuid)
 RETURNS boolean
 LANGUAGE sql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, pg_temp
 AS $$
   SELECT EXISTS (
     SELECT 1
@@ -110,7 +112,7 @@ CREATE FUNCTION is_own_active_trial(target_id uuid)
 RETURNS boolean
 LANGUAGE sql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, pg_temp
 AS $$
   SELECT EXISTS (
     SELECT 1
@@ -120,6 +122,11 @@ AS $$
       AND deleted_at IS NULL
   );
 $$;
+
+REVOKE ALL ON FUNCTION is_own_active_research_line(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION is_own_active_trial(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION is_own_active_research_line(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION is_own_active_trial(uuid) TO authenticated;
 ```
 
 ### 4.2 `research_lines`
@@ -155,11 +162,11 @@ WITH CHECK (user_id = auth.uid());
 `trials` は `user_id` で所有者を判定する。
 
 - select: `user_id = auth.uid()` かつ通常画面では `deleted_at IS NULL`
-- insert: `user_id = auth.uid()` かつ参照する `research_line_id` が本人の未アーカイブ研究ラインである
-- update: `user_id = auth.uid()` かつ更新後も `user_id = auth.uid()`。`research_line_id` を変更する場合は本人の未アーカイブ研究ラインのみ許可する
-- delete: v1ではポリシーを作成しない
+- insert: アプリ向けロールには直接許可しない。`save_trial_with_ingredients` または `clone_trial` で行う
+- update: アプリ向けロールには直接許可しない。編集は `save_trial_with_ingredients`、論理削除は `soft_delete_trial` で行う
+- delete: v1では許可しない
 
-`parent_trial_id` を設定する場合は、同一ユーザーの試行のみ許可する。循環する親子関係は禁止する。
+`parent_trial_id` を設定する場合は、同一ユーザーの試行のみ許可する。自己参照と循環する親子関係は禁止し、RPC内で祖先チェックを行う。
 
 SQL雛形:
 
@@ -167,29 +174,6 @@ SQL雛形:
 CREATE POLICY trials_select_own
 ON trials FOR SELECT
 USING (user_id = auth.uid());
-
-CREATE POLICY trials_insert_own_active_line
-ON trials FOR INSERT
-WITH CHECK (
-  user_id = auth.uid()
-  AND is_own_active_research_line(research_line_id)
-  AND (
-    parent_trial_id IS NULL
-    OR is_own_active_trial(parent_trial_id)
-  )
-);
-
-CREATE POLICY trials_update_own_active_line
-ON trials FOR UPDATE
-USING (user_id = auth.uid())
-WITH CHECK (
-  user_id = auth.uid()
-  AND is_own_active_research_line(research_line_id)
-  AND (
-    parent_trial_id IS NULL
-    OR is_own_active_trial(parent_trial_id)
-  )
-);
 ```
 
 ### 4.4 `trial_ingredients`
@@ -197,9 +181,9 @@ WITH CHECK (
 `trial_ingredients` は自身に `user_id` を持たないため、親 `trials` の所有者で判定する。
 
 - select: 親試行の `user_id = auth.uid()`
-- insert: 挿入先の親試行の `user_id = auth.uid()`
-- update: 更新対象の親試行の `user_id = auth.uid()`
-- delete: 親試行の `user_id = auth.uid()`
+- insert: アプリ向けロールには直接許可しない。`save_trial_with_ingredients` または `clone_trial` で行う
+- update: アプリ向けロールには直接許可しない。v1では材料行は試行保存時に全置換する
+- delete: アプリ向けロールには直接許可しない。v1では材料行は試行保存時に全置換する
 
 材料行を取得・保存する処理では、必ず親試行の所有者確認が通る設計にする。
 
@@ -208,27 +192,6 @@ SQL雛形:
 ```sql
 CREATE POLICY trial_ingredients_select_own
 ON trial_ingredients FOR SELECT
-USING (
-  is_own_active_trial(trial_id)
-);
-
-CREATE POLICY trial_ingredients_insert_own
-ON trial_ingredients FOR INSERT
-WITH CHECK (
-  is_own_active_trial(trial_id)
-);
-
-CREATE POLICY trial_ingredients_update_own
-ON trial_ingredients FOR UPDATE
-USING (
-  is_own_active_trial(trial_id)
-)
-WITH CHECK (
-  is_own_active_trial(trial_id)
-);
-
-CREATE POLICY trial_ingredients_delete_own
-ON trial_ingredients FOR DELETE
 USING (
   is_own_active_trial(trial_id)
 );
@@ -264,9 +227,44 @@ ON trial_stars FOR DELETE
 USING (user_id = auth.uid());
 ```
 
+### 4.6 アプリ向け権限
+
+RLSは最後の防御線であり、アプリの書き込み経路を曖昧にしてよい理由にはならない。v1では、試行本体と材料行の書き込みをRPCに集約し、テーブル直接操作で材料行0件の試行や親子循環を作れる余地を減らす。
+
+権限の基本方針:
+
+| 対象 | `authenticated` に直接許可する操作 |
+|---|---|
+| `research_lines` | select / insert / update |
+| `trials` | select |
+| `trial_ingredients` | select |
+| `trial_stars` | select / insert / delete |
+| `save_trial_with_ingredients` | execute |
+| `clone_trial` | execute |
+| `soft_delete_trial` | execute |
+
+SQL雛形:
+
+```sql
+REVOKE ALL ON research_lines, trials, trial_ingredients, trial_stars FROM anon;
+REVOKE INSERT, UPDATE, DELETE ON trials, trial_ingredients FROM authenticated;
+
+GRANT SELECT, INSERT, UPDATE ON research_lines TO authenticated;
+GRANT SELECT ON trials TO authenticated;
+GRANT SELECT ON trial_ingredients TO authenticated;
+GRANT SELECT, INSERT, DELETE ON trial_stars TO authenticated;
+
+REVOKE ALL ON FUNCTION save_trial_with_ingredients(jsonb) FROM PUBLIC;
+REVOKE ALL ON FUNCTION clone_trial(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION soft_delete_trial(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION save_trial_with_ingredients(jsonb) TO authenticated;
+GRANT EXECUTE ON FUNCTION clone_trial(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION soft_delete_trial(uuid) TO authenticated;
+```
+
 ## 5. RPC方針
 
-v1で許可するRPCは、複数テーブルをまとめて扱う処理に限定する。初期対象は `save_trial_with_ingredients(input jsonb)` と `clone_trial(source_trial_id uuid)` のみである。
+v1で許可するRPCは、試行の整合性を守る処理に限定する。対象は `save_trial_with_ingredients(input jsonb)`、`clone_trial(source_trial_id uuid)`、`soft_delete_trial(trial_id uuid)` のみである。
 
 ### 5.1 `save_trial_with_ingredients`
 
@@ -276,9 +274,11 @@ v1で許可するRPCは、複数テーブルをまとめて扱う処理に限定
 2. 新規作成時は、入力された `research_line_id` が認証ユーザー本人の未アーカイブ研究ラインであることを確認する。
 3. 編集時は、対象試行が認証ユーザー本人の未削除試行であることを確認する。
 4. `parent_trial_id` がある場合は、認証ユーザー本人の未削除試行であることを確認する。
-5. 材料行は全置換とする。既存材料行を削除し、入力された材料行を再作成する。
-6. 試行本体と材料行の保存は同一トランザクションで行い、一部だけ成功した状態を残さない。
-7. 失敗時は内部情報を返さない。
+5. `parent_trial_id` が自分自身または子孫試行を指す場合は失敗する。
+6. 入力JSONは詳細設計書の `SaveTrialInput` に一致することを確認し、未知キーを許可しない。
+7. 材料行は1行以上必須とし、全置換する。既存材料行を削除し、入力された材料行を再作成する。
+8. 試行本体と材料行の保存は同一トランザクションで行い、一部だけ成功した状態を残さない。
+9. 失敗時は内部情報を返さない。
 
 ### 5.2 `clone_trial`
 
@@ -294,7 +294,18 @@ v1で許可するRPCは、複数テーブルをまとめて扱う処理に限定
 8. 新しい試行IDを返す。
 9. 失敗時は内部情報を返さない。
 
-RPCで `security definer` を使う場合は、必ず関数内で `auth.uid()` と所有者を照合し、`search_path` を固定する。
+### 5.3 `soft_delete_trial`
+
+`soft_delete_trial` は以下を満たす。
+
+1. `trial_id` が認証ユーザー本人の未削除試行であることを確認する。
+2. `deleted_at` を設定する。
+3. 物理削除は行わない。
+4. 関連する `trial_ingredients` と `trial_stars` は物理削除しない。
+5. 既に論理削除済みの場合は失敗する。
+6. 失敗時は内部情報を返さない。
+
+RPCで `security definer` を使う場合は、必ず関数内で `auth.uid()` と所有者を照合し、`search_path` を `public, pg_temp` に固定する。関数作成後は `PUBLIC` の実行権限を取り消し、`authenticated` にだけ必要な `EXECUTE` を付与する。
 
 ## 6. RLSテスト要件
 
@@ -306,6 +317,8 @@ DB変更を含む実装では、最低限以下を確認する。
 | ユーザーAがユーザーBの研究ラインを取得する | 0件または権限エラーになる。 |
 | ユーザーAがユーザーBの試行を取得する | 0件または権限エラーになる。 |
 | ユーザーAがユーザーBの試行に材料行を追加する | 失敗する。 |
+| ユーザーAがRPCを通さずに `trials` を直接insert/updateする | 失敗する。 |
+| ユーザーAがRPCを通さずに `trial_ingredients` を直接insert/update/deleteする | 失敗する。 |
 | ユーザーAがユーザーBの試行を複製する | 失敗する。 |
 | ユーザーAがユーザーBの試行にスターを付ける | 失敗する。 |
 | 未認証状態で業務テーブルを読む | 失敗する。 |
@@ -313,6 +326,7 @@ DB変更を含む実装では、最低限以下を確認する。
 | ユーザーAが `trials` を物理削除する | 失敗する。 |
 | `save_trial_with_ingredients` が試行本体と材料行を同時に保存する | 一部保存の状態を残さない。 |
 | `clone_trial` が材料行をコピーしスターをコピーしない | 期待どおりの新規試行が作成される。 |
+| `soft_delete_trial` が本人の未削除試行だけを論理削除する | `deleted_at` が設定され、物理削除はされない。 |
 
 ## 7. レビュー必須条件
 
