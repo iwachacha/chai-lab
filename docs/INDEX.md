@@ -14,8 +14,8 @@ PJ全体で継続利用する入口、判断モデル、作業手順、記録方
 | [agent-relationship-governance.md](agent-relationship-governance.md) | AI自律判断、AI自己監査、人間確認範囲の上位モデル。 |
 | [agent-workflow.md](agent-workflow.md) | 実装前、危険変更前、停止時、エスカレーション時の作業手順。 |
 | [codex-execution-rules.md](codex-execution-rules.md) | Codex / AIエージェントによる実装ルール。 |
-| [templates/worklog.md](templates/worklog.md) | PR前またはAI単独作業で使う作業記録テンプレート。 |
-| [pull_request_template.md](../.github/pull_request_template.md) | PR本文を正式記録にするための入口。 |
+| [templates/worklog.md](templates/worklog.md) | PR前またはAI単独作業で使う作業記録テンプレート。確認対象、正本、GitHub反映状況、停止条件を含む。 |
+| [pull_request_template.md](../.github/pull_request_template.md) | PR本文を正式記録にするための入口。worklogと同じ証跡項目をPR上で残す。 |
 
 ## 現行フェーズ契約
 

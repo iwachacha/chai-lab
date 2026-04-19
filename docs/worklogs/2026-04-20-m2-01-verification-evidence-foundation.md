@@ -57,4 +57,10 @@
 - 完了扱いにできる理由: `supabase/` の非危険な土台、再利用可能な検証手順/チェックリスト、検証SQLテンプレート、補助証跡置き場、worklogの固定項目を揃えたため
 - 大きなコード変更の場合のCI結果: 対象外。
 - 軽微変更の場合にpush/CI監視を省略した理由: docs主体の土台整備であり、ローカルdocsチェックを完了条件にするため
+
+## 追補 (2026-04-20 repo reflection alignment)
+
+- この記録は、変更完了前のGitHub反映を必須にする前の運用時点の事実を残したものです。
+- 本文中の `軽微変更のためpush/CI監視を省略` という判断は履歴として残しますが、現行運用の根拠には使いません。
+- 現行の正本は `AGENTS.md`、`docs/agent-workflow.md`、`docs/codex-execution-rules.md`、`docs/templates/worklog.md`、`.github/pull_request_template.md` を参照します。
 - 後続で見直す条件: 非本番検証方式がSupabase local運用と衝突する場合、または補助証跡の置き場を別パスへ移す必要が出た場合

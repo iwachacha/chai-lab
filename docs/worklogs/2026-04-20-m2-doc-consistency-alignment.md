@@ -59,3 +59,9 @@
 - 大きなコード変更の場合のCI結果: 対象外。
 - 軽微変更の場合にpush/CI監視を省略した理由: docs-only整合修正であり、ローカルdocsチェックを完了条件にするため
 - 後続で見直す条件: M2番号体系を将来再編する設計判断が別途必要になった場合
+
+## 追補 (2026-04-20 repo reflection alignment)
+
+- この記録は、変更完了前のGitHub反映を必須にする前の運用時点の事実を残したものです。
+- 本文中の `軽微変更のためpush/CI監視を省略` という判断は履歴として残しますが、現行運用の根拠には使いません。
+- 現行の正本は `AGENTS.md`、`docs/agent-workflow.md`、`docs/codex-execution-rules.md`、`docs/templates/worklog.md`、`.github/pull_request_template.md` を参照します。

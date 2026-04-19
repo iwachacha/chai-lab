@@ -58,4 +58,10 @@
 - 完了扱いにできる理由: 今回の役割であるM2-00レビューとして、作業分割、依存関係、完了条件、停止条件、検証、証跡方針、最初の実装単位を文書へ反映できたため。
 - 大きなコード変更の場合のCI結果: 対象外。
 - 軽微変更の場合にpush/CI監視を省略した理由: docs-onlyの計画レビューで、現時点ではローカルdocsチェックを完了条件にするため。
+
+## 追補 (2026-04-20 repo reflection alignment)
+
+- この記録は、変更完了前のGitHub反映を必須にする前の運用時点の事実を残したものです。
+- 本文中の `軽微変更のためpush/CI監視を省略` という判断は履歴として残しますが、現行運用の根拠には使いません。
+- 現行の正本は `AGENTS.md`、`docs/agent-workflow.md`、`docs/codex-execution-rules.md`、`docs/templates/worklog.md`、`.github/pull_request_template.md` を参照します。
 - 後続で見直す条件: 非本番DB検証方式が実repo構成やSupabase local運用と衝突する場合、または`research_lines` を最初のend-to-end DB sliceにできない新しい文書根拠が出た場合。

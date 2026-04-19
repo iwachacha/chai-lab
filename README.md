@@ -10,7 +10,7 @@ AIエージェントまたは開発者の正本入口は [AGENTS.md](AGENTS.md) 
 
 文書の分類は [docs/INDEX.md](docs/INDEX.md) を参照してください。恒久運用文書、現行フェーズ契約、判断記録を分けて確認できます。
 
-作業記録が必要な場合は [docs/templates/worklog.md](docs/templates/worklog.md) の項目を使います。PRでは `.github/pull_request_template.md` が同じ導線を示します。
+作業記録が必要な場合は [docs/templates/worklog.md](docs/templates/worklog.md) の項目を使います。PRでは `.github/pull_request_template.md` が同じ導線を示します。変更を伴う作業は、正本ファイルを先に直し、GitHubへ反映してから完了報告します。
 
 運用文書の参照切れや入口欠落を確認するときは、次を実行します。
 
