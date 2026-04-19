@@ -1,0 +1,9 @@
+{
+  "name": "chai-lab",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "npm run check:docs",
+    "check:docs": "node scripts/check-operational-docs.mjs"
+  }
+}

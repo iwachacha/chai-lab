@@ -4,14 +4,28 @@
 
 v1は、公開レシピサービスやSNSではなく、非公開の個人研究ログとして実装します。実装前の判断では、次の契約文書を優先します。
 
+## AI / 開発者入口
+
+AIエージェントまたは開発者は、最初に [AGENTS.md](AGENTS.md) を読み、作業対象に応じて参照文書を絞ります。SKILLは現時点では作りません。理由と見直し条件は [docs/agent-relationship-governance-decision.md](docs/agent-relationship-governance-decision.md) に従います。
+
+作業記録が必要な場合は [docs/templates/worklog.md](docs/templates/worklog.md) の項目を使います。PRでは `.github/pull_request_template.md` が同じ導線を示します。
+
+運用文書の参照切れや入口欠落を確認するときは、次を実行します。
+
+```bash
+npm run check:docs
+```
+
 ## 文書一覧
 
 | 文書 | 役割 |
 |---|---|
+| [AGENTS.md](AGENTS.md) | AIエージェントと開発者が最初に読む入口。 |
 | [docs/pj-policy.md](docs/pj-policy.md) | プロジェクト方針、開発姿勢、ベンダー的判断基準。 |
 | [docs/agent-relationship-governance.md](docs/agent-relationship-governance.md) | AI自律判断、AI自己監査、人間確認範囲の最上位運用モデル。 |
 | [docs/agent-workflow.md](docs/agent-workflow.md) | 実装前、危険変更前、停止時、エスカレーション時のAI作業手順。 |
 | [docs/agent-relationship-governance-decision.md](docs/agent-relationship-governance-decision.md) | 関係性ガバナンスをどの形式で正式化するかの判断記録。 |
+| [docs/templates/worklog.md](docs/templates/worklog.md) | PR前またはAI単独作業で使う作業記録テンプレート。 |
 | [docs/mvp-scope-contract.md](docs/mvp-scope-contract.md) | v1で実装するもの・しないものの最終スコープ契約。 |
 | [docs/app-proposal.md](docs/app-proposal.md) | 企画、コンセプト、市場背景、ロードマップ。 |
 | [docs/app-rdd.md](docs/app-rdd.md) | v1要件定義。 |

@@ -6,6 +6,8 @@
 
 **運用注記:** 判断主体とエスカレーション範囲は `docs/agent-relationship-governance.md` を優先し、実装前、危険変更前、停止時、エスカレーション時の手順は `docs/agent-workflow.md` に従う。Codexは依頼者に技術承認を求める前に、文書根拠、v1整合、安全性、単純性、可逆性、監査可能性に基づいて推奨案を1つに絞り、自律的に進める。人間確認はスコープ変更、外部契約、本番データ、不可逆操作、純粋なプロダクト方針選択に限定する。
 
+AIエージェントと開発者の入口は `AGENTS.md` とする。`/SKILL.md` は現時点では作らず、採用しない理由と見直し条件は `docs/agent-relationship-governance-decision.md` に従う。
+
 ## 1. 最優先原則
 
 Codexは、ユーザーの指示をそのまま実装する前に、必ず以下を確認する。
@@ -24,6 +26,7 @@ Codexは、実装対象に応じて以下を確認する。
 
 | 変更内容 | 必ず確認する文書 |
 |---|---|
+| リポジトリ入口 | `AGENTS.md`, `README.md` |
 | スコープ判断 | `docs/mvp-scope-contract.md` |
 | 要件確認 | `docs/app-rdd.md` |
 | DB / RLS / RPC | `docs/app-lld.md`, `docs/db-migration-rls-policy.md` |
@@ -165,6 +168,8 @@ Codexは、変更種別に応じて以下を実行または提案する。
 
 実装コードが存在する段階では、Codexは自己監査の宣言だけで完了扱いにしない。変更完了前に、該当範囲へ次のような機械的チェックを実行し、検出があれば内容を確認する。検出がv1スコープ逸脱、secret混入、direct CRUD、静的export制約違反に該当する場合は、そのまま完了してはならない。
 
+運用文書、入口、template、workflow、CI、scriptsを変更した場合は、最低限 `npm run check:docs` を実行する。
+
 ```bash
 rg -n -g "!docs/**" -g "!README.md" "SUPABASE_SERVICE_ROLE_KEY|service_role|DB_CONNECTION|DATABASE_URL|OPENAI_API_KEY|R2_|STORAGE_" .
 rg -n -g "!docs/**" -g "!README.md" "from\\(['\"]trials['\"]\\)\\.(insert|update|upsert|delete)|from\\(['\"]trial_ingredients['\"]\\)\\.(insert|update|upsert|delete)" .
@@ -189,6 +194,7 @@ rg -n -g "!docs/**" -g "!README.md" "public_slug|share_token|visibility|follow|c
 | 技術スタック変更 | `tech-stack.md` |
 | デプロイ、環境変数、認証リダイレクト、ルーティング変更 | `deployment-contract.md` |
 | AI関係性・作業手順・Codex運用変更 | `agent-relationship-governance.md`, `agent-workflow.md`, `codex-execution-rules.md`, `pj-policy.md` |
+| 入口、作業記録、PR導線、文書チェック変更 | `AGENTS.md`, `README.md`, `docs/templates/worklog.md`, `.github/pull_request_template.md`, `scripts/check-operational-docs.mjs` |
 
 文書更新なしに、スコープ、DB、RLS、画面、外部サービス、技術スタックを変更してはならない。
 
