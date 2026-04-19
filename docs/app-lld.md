@@ -1,409 +1,318 @@
 # チャイ研究アプリ 詳細設計書 (v1)
 
 **作成日:** 2026-04-18
-
-この詳細設計書は、要件定義書で定義された機能と非機能要件を実装するための具体的な設計をまとめたものです。システム全体の構成、データベーススキーマ、API仕様、画面設計、オフライン対応、認証・権限管理、テスト・運用方針などを記載します。設計内容は2026年4月時点の技術とサービス提供条件に基づいており、Cloudflare Pages と Supabase の無料プラン特性を考慮していることに留意してください。
+**改訂方針:** v1は非公開の個人研究ログに限定し、研究ライン、試行、複製、履歴、スターを安全に実装する。
 
 ## 1. システムアーキテクチャ
 
-### 1.1 全体構成
+### 1.1 v1の全体構成
 
-```
+v1では、Cloudflare Pages上で動作する静的Next.jsアプリを基本構成とする。CRUD処理はSupabase ClientからPostgreSQLへアクセスし、RLSでユーザー単位のデータ隔離を行う。Next.js API Routes、Cloudflare Pages Functions、GraphQL、Realtimeはv1では原則使用しない。
+
+```text
 ユーザー端末
-└─ブラウザ (Next.js PWA)
-    ├─ UI層 (Reactコンポーネント)
-    ├─ ステート管理層 (React Context + SWR)
-    ├─ Service Worker / Workbox (キャッシュ管理, オフライン同期)
-    └─ APIクライアント層 (Supabase Client SDK)
+└─ ブラウザ
+   └─ Next.js 静的アプリ
+      ├─ React UI
+      ├─ React Hook Form + Zod
+      ├─ TanStack Query
+      ├─ Supabase Client
+      └─ localStorage / IndexedDB による軽量下書き
 
 クラウド側
-└─ Cloudflare Pages (静的ファイル配信, Functions)
-    ├─ 静的アセット (JS, CSS, manifest, SW)
-    └─ Functions (GraphQL/REST エンドポイント, edge middleware)
-
-└─ Supabase (BaaS)
-    ├─ Postgres DB (RLS設定)
-    ├─ Auth (Magic Link, JWT)
-    ├─ Storage (画像保存)
-    ├─ Realtime (将来拡張) 
-    └─ Edge Functions (API, 認証リダイレクト等)
-
-└─ Cloudflare R2 (将来の画像・データ拡張ストレージ)
+├─ Cloudflare Pages
+│  └─ 静的アセット配信
+└─ Supabase
+   ├─ Auth
+   ├─ PostgreSQL
+   ├─ RLS
+   └─ 必要最小限のPostgres RPC
 ```
 
-- **フロントエンド:** Next.js 16 以降。App Routerで各画面をコンポーネント化し、クライアントコンポーネントでユーザー操作を処理する。
-- **バックエンド:** Supabase をメインデータストアとして使用。アプリ固有のロジックは Next.js API route や Supabase Edge Function に実装。Cloudflare Pages Functions には最低限の処理 (リダイレクトやヘッダー制御) を配置。
-- **デプロイ:** GitHub Actions でビルドとデプロイを自動化。Cloudflare Pages の 500ビルド/月を超えないよう、マージ時のみデプロイするフローとする。
+### 1.2 v1で使用しないもの
 
-### 1.2 コンポーネント構成
+以下はv1では使用しない。
 
-| レイヤ | 主な役割 | 実装候補 |
-|---|---|---|
-| **UI層** | 画面表示、ユーザー入力、フォームコンポーネント、モーダル、日付ピッカーなど | Next.js + React + UIライブラリ (Chakra UI, MUI など) |
-| **ステート管理** | ユーザーセッション、編集中の試行、ロード状態、フォーム設定 | React Context + Zustand または Redux Toolkit |
-| **APIクライアント** | Supabase JavaScript Client (Auth, DB, Storage 呼び出し) |
-| **オフラインキャッシュ** | Service Worker + Workbox：App shellは Cache First、API は Network First、画像は Stale-While-Revalidate |
-| **サーバーサイド/Functions** | Supabase Edge Functions: 記録作成時の追加検証や変換処理。将来的なAI提案APIのラッパー。 |
-| **DB層** | PostgreSQL (Supabase)。RLSによるアクセス制御。 |
-| **ストレージ** | Supabase Storage (初期)、R2 (将来) |
+- Next.js API Routes
+- Cloudflare Pages Functions
+- GraphQL
+- Supabase Realtime
+- Supabase Storage
+- Cloudflare R2
+- Workboxによるオフライン自動同期
+- 外部AI API
 
-### 1.3 キャッシュ戦略とオフライン対応
+### 1.3 サーバー側ロジック
 
-- App shell (ナビゲーションバー、フッター、スタイルシート、共通JS) は **Cache First** でサービスワーカー起動時にプリキャッシュする。更新時は`skipWaiting`/`clients.claim`で即時反映。
-- API呼び出し (Supabase) は **Network First + Cache Fallback**。オンラインであれば最新データを取得し、オフライン時は IndexedDB または Cache Storage の応答を返す。
-- 画像は **Stale-While-Revalidate** で表示速度を優先しつつ、バックグラウンド更新。
-- ローカル変更(試行の下書き)は IndexedDB に一時保存し、オンライン復帰時に Supabase へ同期する。
-- Service Worker は Workbox を利用し、precachingマニフェスト、ランタイムキャッシュ制御、バージョン管理を自動化。
+v1でサーバー側の整合性が必要な処理は、Supabase Postgres RPCとして実装する。対象は、試行本体と材料行を同時に保存する `save_trial_with_ingredients` と、既存試行を複製する `clone_trial` に限定する。
 
 ## 2. データベース設計
 
-Supabase の Postgres を利用し、テーブルごとに主キーを `uuid` 型で生成する。日付・時刻は `timestamptz`。ユーザーIDは Supabase Auth が生成する `uuid` を参照。関係の整合性を保つため外部キー制約を使用する。
+v1のDBは、非公開の個人研究ログを安全に保存し、試行を複製できることを目的とする。公開機能、材料マスター、スパイスブレンド、写真、カスタム項目、定番昇格はv1のDBに含めない。
 
-### 2.1 ER図 (概念)
+### 2.1 テーブル一覧
 
-```
-users (id) 1 ──∞ recipe_bases (user_id)
-recipe_bases (id) 1 ──∞ trials (recipe_base_id)
-trials (id) 1 ──∞ trial_photos (trial_id)
-trials (id) 1 ──∞ favorites (trial_id)  (favorites can also reference recipe_bases)
-trials (id) 1 ──∞ branches (child_id)
-trials (id) 0..1 ──1 branches (parent_id)
-materials, spice_blends etc. are referenced by pivot tables
-```
+| テーブル | 役割 |
+|---|---|
+| `research_lines` | 研究テーマを表す。 |
+| `trials` | 1回分の試行ログを表す。 |
+| `trial_ingredients` | 試行に含まれる材料行を表す。 |
+| `trial_stars` | ユーザーが試行に付けるスターを表す。 |
 
-### 2.2 テーブル定義例
-
-以下は主要テーブルのDDL例。プライマリキーと外部キー、制約を明示し、RLSの記述は3.5節にて扱う。
-
-#### 2.2.1 users (Supabase Auth)
-Supabase が提供する `auth.users` を使用。アプリ側で独自プロフィールが必要な場合は `profiles` テーブルを追加。例：
+### 2.2 DDL方針
 
 ```sql
-CREATE TABLE profiles (
-  id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-  display_name text NOT NULL,
-  avatar_url text,
-  created_at timestamptz NOT NULL DEFAULT now()
-);
-```
-
-#### 2.2.2 materials
-
-```sql
-CREATE TABLE materials (
+CREATE TABLE research_lines (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  name text NOT NULL,
-  category text NOT NULL CHECK (category IN ('tea','milk','sweetener','spice','ginger','other')),
-  unit text NOT NULL, -- g, ml, piece 等
-  attributes jsonb, -- 任意の追加情報（脂肪分, 茶葉形状など）
-  created_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (user_id, name, category)
-);
-```
-
-#### 2.2.3 spice_blends
-
-```sql
-CREATE TABLE spice_blends (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  name text NOT NULL,
+  title text NOT NULL,
   description text,
   created_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (user_id, name)
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  archived_at timestamptz
 );
 
-CREATE TABLE spice_blend_items (
-  blend_id uuid NOT NULL REFERENCES spice_blends(id) ON DELETE CASCADE,
-  material_id uuid NOT NULL REFERENCES materials(id) ON DELETE CASCADE,
-  amount numeric NOT NULL,
-  unit text NOT NULL,
-  PRIMARY KEY (blend_id, material_id)
-);
-```
-
-#### 2.2.4 recipe_bases
-
-```sql
-CREATE TABLE recipe_bases (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  name text NOT NULL,
-  description text,
-  tags text[],
-  visibility text NOT NULL DEFAULT 'private' CHECK (visibility IN ('private','limited','public')),
-  created_at timestamptz NOT NULL DEFAULT now()
-);
-```
-
-#### 2.2.5 trials
-
-```sql
 CREATE TABLE trials (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  recipe_base_id uuid REFERENCES recipe_bases(id) ON DELETE SET NULL,
+  research_line_id uuid NOT NULL REFERENCES research_lines(id) ON DELETE CASCADE,
   parent_trial_id uuid REFERENCES trials(id) ON DELETE SET NULL,
-  name text NOT NULL,
-  summary text, -- 概要: 今日の狙いや一言
-  date timestamptz NOT NULL DEFAULT now(),
-  overall_rating numeric CHECK (overall_rating >= 0 AND overall_rating <= 5),
-  total_brewing_time numeric, -- 全体の煮出し時間
-  attributes jsonb, -- 詳細入力項目: スパイス順序, こし方, 投入タイミング
-  custom_values jsonb, -- カスタム項目の値(key-value)
-  visibility text NOT NULL DEFAULT 'private' CHECK (visibility IN ('private','limited','public')),
-  created_at timestamptz NOT NULL DEFAULT now()
-);
-```
-
-#### 2.2.6 trial_materials (pivot)
-
-```sql
-CREATE TABLE trial_materials (
-  trial_id uuid NOT NULL REFERENCES trials(id) ON DELETE CASCADE,
-  material_id uuid NOT NULL REFERENCES materials(id) ON DELETE CASCADE,
-  amount numeric NOT NULL,
-  unit text NOT NULL,
-  timing text, -- 例: 'start','middle','end'
-  PRIMARY KEY (trial_id, material_id)
-);
-```
-
-#### 2.2.7 trial_spice_blends
-
-```sql
-CREATE TABLE trial_spice_blends (
-  trial_id uuid NOT NULL REFERENCES trials(id) ON DELETE CASCADE,
-  blend_id uuid NOT NULL REFERENCES spice_blends(id) ON DELETE CASCADE,
-  PRIMARY KEY (trial_id, blend_id)
-);
-```
-
-#### 2.2.8 trial_photos
-
-```sql
-CREATE TABLE trial_photos (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  trial_id uuid NOT NULL REFERENCES trials(id) ON DELETE CASCADE,
-  file_path text NOT NULL, -- Supabase Storage path
-  description text,
-  created_at timestamptz NOT NULL DEFAULT now()
-);
-```
-
-#### 2.2.9 favorites
-
-```sql
-CREATE TABLE favorites (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  target_type text NOT NULL CHECK (target_type IN ('recipe_base','trial')),
-  target_id uuid NOT NULL,
-  level text NOT NULL CHECK (level IN ('star','favorite','standard')),
+  title text NOT NULL,
+  brewed_at timestamptz NOT NULL DEFAULT now(),
+  rating smallint NOT NULL CHECK (rating BETWEEN 1 AND 5),
+  brewing_time_minutes numeric(6,2),
+  boil_count smallint CHECK (boil_count >= 0),
+  strainer text,
+  note text NOT NULL CHECK (btrim(note) <> ''),
+  next_idea text NOT NULL CHECK (btrim(next_idea) <> ''),
   created_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (user_id, target_type, target_id)
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  deleted_at timestamptz
+);
+
+CREATE TABLE trial_ingredients (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  trial_id uuid NOT NULL REFERENCES trials(id) ON DELETE CASCADE,
+  category text NOT NULL CHECK (category IN ('tea','water','milk','sweetener','spice','other')),
+  name text NOT NULL,
+  amount numeric(8,2) CHECK (amount IS NULL OR amount >= 0),
+  unit text,
+  timing text,
+  display_order integer NOT NULL DEFAULT 0
+);
+
+CREATE TABLE trial_stars (
+  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  trial_id uuid NOT NULL REFERENCES trials(id) ON DELETE CASCADE,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, trial_id)
 );
 ```
 
-#### 2.2.10 branches
+### 2.3 制約
+
+- `trials.research_line_id` は必須とする。
+- 新規作成または研究ライン変更時の `research_line_id` は、認証ユーザー本人の未アーカイブ研究ラインのみ参照できる。
+- `trials.parent_trial_id` は同一ユーザーの試行のみ参照できる。
+- `parent_trial_id` の循環は禁止する。試行複製RPCまたは更新処理で祖先チェックを行う。
+- `trial_ingredients` は材料マスターを参照しない。v1では試行時点の材料名と量をスナップショットとして保存する。
+- `deleted_at` は試行の論理削除に使用する。物理削除はv1では管理者作業または将来のクリーンアップ対象とする。
+- 研究ラインのアーカイブは `archived_at` 更新で表す。v1のUIとクライアント処理から物理削除は行わない。
+
+### 2.4 インデックス
 
 ```sql
-CREATE TABLE branches (
-  child_id uuid PRIMARY KEY REFERENCES trials(id) ON DELETE CASCADE,
-  parent_id uuid REFERENCES trials(id) ON DELETE SET NULL
-);
+CREATE INDEX idx_research_lines_user_id ON research_lines(user_id);
+CREATE UNIQUE INDEX idx_research_lines_active_title
+  ON research_lines(user_id, title)
+  WHERE archived_at IS NULL;
+CREATE INDEX idx_trials_user_id ON trials(user_id);
+CREATE INDEX idx_trials_research_line_id ON trials(research_line_id);
+CREATE INDEX idx_trials_parent_trial_id ON trials(parent_trial_id);
+CREATE INDEX idx_trials_brewed_at ON trials(brewed_at DESC);
+CREATE INDEX idx_trials_user_brewed_active ON trials(user_id, brewed_at DESC)
+  WHERE deleted_at IS NULL;
+CREATE INDEX idx_trial_ingredients_trial_id ON trial_ingredients(trial_id);
 ```
 
-### 2.3 インデックスとパフォーマンス
+## 3. データアクセス / API設計
 
-- `trials.user_id`、`trials.recipe_base_id` にB-treeインデックスを作成し、ユーザーごとの検索やレシピベース絞り込みを高速化。
-- `trial_materials.material_id` にはインデックスを付与し、特定材料を使用した試行検索に備える。
-- JSONBカラム(`attributes`,`custom_values`)にはGINインデックスを設定し、特定キーの検索を高速化。
+v1では独自REST APIを原則作成しない。フロントエンドはSupabase Clientを通じて、RLSで保護されたテーブルへアクセスする。複数テーブルの整合性が必要な試行保存と試行複製のみPostgres RPCを使用する。
 
-## 3. API設計
+### 3.1 クライアント操作
 
-RESTfulなエンドポイントを Next.js API routes または Supabase Edge Functions に実装する。これによりクライアントから直接Supabaseを利用する方法と独自バックエンドAPIの併用が可能になる。
+| 操作 | 方法 |
+|---|---|
+| 研究ライン一覧取得 | `research_lines` を認証ユーザー条件で取得 |
+| 研究ライン作成・編集 | `research_lines` へ insert / update |
+| 試行一覧取得 | `trials` と `trial_stars` を取得。材料詳細は必要時に取得 |
+| 試行詳細取得 | `trials` と `trial_ingredients` を取得 |
+| 試行作成・編集 | `save_trial_with_ingredients(input jsonb)` RPC を呼び出す |
+| スター切替 | `trial_stars` に insert / delete |
+| 試行複製 | `clone_trial(source_trial_id uuid)` RPC を呼び出す |
 
-### 3.1 認証・セッション
+### 3.2 `save_trial_with_ingredients` RPC
 
-- ユーザーはメールアドレスで登録し、Magic Linkでログイン。Supabase Auth が `access_token` (JWT) を発行する。
-- クライアントはSupabase SDKを用いて `supabase.auth.getSession()` でセッションを取得。JWTはHTTP-Only Cookieまたは localStorage に保存する。
-- APIルートでは `Authorization: Bearer <jwt>` ヘッダーを受け取り、Supabaseの `auth.api.getUser()` でユーザー検証を行う。
+`save_trial_with_ingredients(input jsonb)` は、試行本体と材料行を1トランザクションで保存し、保存後の試行IDを返す。
 
-### 3.2 基本エンドポイント一覧
+- 新規作成時は `input.id` を空にし、認証ユーザー本人の未アーカイブ研究ラインに試行を作成する。
+- 編集時は `input.id` が認証ユーザー本人の未削除試行であることを確認する。
+- 材料行はv1では全置換とする。保存時に既存材料行を削除し、入力された材料行を `display_order` 順で再作成する。
+- `parent_trial_id` を設定する場合は、認証ユーザー本人の未削除試行のみ許可する。
+- `research_line_id` を変更する場合は、変更先が認証ユーザー本人の未アーカイブ研究ラインであることを確認する。
+- 保存中に一部だけ成功した状態を残さない。
 
-| エンドポイント | メソッド | 説明 | 認可 | 入力 | 出力 |
-|---|---|---|---|---|---|
-| `/api/recipe-bases` | GET | ユーザーのレシピベース一覧取得 | 要ログイン | クエリ: `visibility` / `tags` | `[{ id, name, tags, created_at, visibility }]` |
-| `/api/recipe-bases` | POST | 新規レシピベース作成 | 要ログイン | JSON: `name, description, tags, visibility` | `{ id }` |
-| `/api/recipe-bases/{id}` | GET | レシピベース詳細 | 公開の場合誰でも/非公開は本人のみ | - | `{ id, name, description, trials_count, tags }` |
-| `/api/recipe-bases/{id}` | PATCH | レシピベース更新 | 本人のみ | JSON: `name?`, `description?`, `tags?`, `visibility?` | `200 OK` |
-| `/api/recipe-bases/{id}` | DELETE | レシピベース削除 | 本人のみ | - | `204 No Content` |
-| `/api/trials` | GET | 試行リスト取得 | 本人のみ (公開設定により他ユーザー閲覧可) | クエリ: `recipe_base_id`, `date_from`, `date_to`, `query`, `star_only`, `rating_min` | `[{ id, name, date, overall_rating, recipe_base_id }]` |
-| `/api/trials` | POST | 新規試行登録 | 要ログイン | JSON: 詳細後述 | `{ id }` |
-| `/api/trials/{id}` | GET | 試行詳細 | 公開設定による | - | `{ id, name, date, recipe_base_id, parent_trial_id, materials: [...], spices: [...], attributes, custom_values, photos: [...], overall_rating, visibility }` |
-| `/api/trials/{id}` | PATCH | 試行更新 | 本人のみ | JSON: 更新対象フィールド | `200 OK` |
-| `/api/trials/{id}` | DELETE | 試行削除 | 本人のみ | - | `204 No Content` |
-| `/api/trials/{id}/clone` | POST | 試行の複製 | 本人のみ | JSON: `new_name?`, `visibility?`, `override_fields?` | `{ new_trial_id }` |
-| `/api/comparison` | POST | 2件比較 | 公開設定による | JSON: `trial_id_a`, `trial_id_b` | 差分オブジェクト(材料・工程・評価の比較) |
-| `/api/favorites` | GET | お気に入り一覧 | 本人のみ | クエリ: `level` | `[{ target_type, target_id, level }]` |
-| `/api/favorites` | POST | お気に入り登録 | 本人のみ | JSON: `target_type`, `target_id`, `level` | `200 OK` |
-| `/api/favorites/{id}` | DELETE | お気に入り解除 | 本人のみ | - | `204 No Content` |
-| `/api/upload-url` | POST | 画像アップロード用署名URL発行 | 要ログイン | JSON: `file_name`, `file_type` | `{ url, fields }` |
+### 3.3 `clone_trial` RPC
 
-- 画像アップロードは Supabase Storage の [signed URL](https://supabase.com/docs/guides/storage#uploading-files) を利用し、クライアントから直接アップロードすることでバックエンドの負荷を減らす。
-- `override_fields` には複製時に変更したいフィールドを指定し、サーバー側で差分を適用する。
+`clone_trial` は指定された試行を複製し、新しい試行IDを返す。
 
-### 3.3 リクエストフォーマット (試行登録)
+- 元試行が認証ユーザーのものでない場合は失敗する。
+- 元試行が論理削除済みの場合は失敗する。
+- 元試行の研究ラインがアーカイブ済みの場合は失敗する。
+- `trial_ingredients` をコピーする。
+- 新しい試行の `parent_trial_id` には元試行IDを設定する。
+- `trial_stars` はコピーしない。
+- `created_at`、`updated_at` は新規作成時刻とする。
 
-```json
-{
-  "recipe_base_id": "uuid",
-  "parent_trial_id": "uuid or null",
-  "name": "試行名",
-  "summary": "一言メモ",
-  "date": "2026-04-18T09:30:00+09:00",
-  "materials": [
-    { "material_id": "uuid", "amount": 200, "unit": "ml", "timing": "start" },
-    ...
-  ],
-  "spice_blends": ["blend_uuid1", "blend_uuid2"],
-  "attributes": { "brew_method": "water-first", "boil_times": 1, "filter_type": "fine" },
-  "custom_values": { "チャイ感": 4.5, "温まり度": 5 },
-  "overall_rating": 4.7,
-  "visibility": "private"
-}
-```
+コピー対象は以下とする。
 
-### 3.4 応答フォーマット (比較)
+| フィールド | 複製時の扱い |
+|---|---|
+| `user_id` | `auth.uid()` を設定する。 |
+| `research_line_id` | 元試行と同じ研究ラインを設定する。ただし研究ラインがアーカイブ済みなら失敗する。 |
+| `parent_trial_id` | 元試行IDを設定する。 |
+| `title` | 元試行タイトルを初期値としてコピーする。 |
+| `brewed_at` | 新規作成時刻を設定する。 |
+| `rating` | 元試行の値をコピーする。 |
+| `brewing_time_minutes` | 元試行の値をコピーする。 |
+| `boil_count` | 元試行の値をコピーする。 |
+| `strainer` | 元試行の値をコピーする。 |
+| `note` | 元試行の値をコピーする。 |
+| `next_idea` | 元試行の値をコピーする。 |
+| `deleted_at` | `null` を設定する。 |
+| `trial_ingredients` | 全行をコピーする。 |
+| `trial_stars` | コピーしない。 |
 
-```json
-{
-  "trial_a_id": "uuid",
-  "trial_b_id": "uuid",
-  "materials_diff": [
-    { "material_id": "uuid", "name": "生姜", "amount_a": 5, "amount_b": 8, "unit": "g" },
-    ...
-  ],
-  "attributes_diff": {
-    "brew_method": { "a": "water-first", "b": "milk-first" },
-    "boil_times": { "a": 1, "b": 2 }
-  },
-  "custom_values_diff": {
-    "チャイ感": { "a": 4, "b": 5 },
-    "甘さ": { "a": 3, "b": 2 }
-  },
-  "overall_rating_diff": { "a": 4.5, "b": 4.7 }
-}
-```
+### 3.4 エラー方針
 
-### 3.5 RLS (Row-Level Security) ポリシー
+v1ではUI側で次のエラー分類を扱う。
 
-SupabaseではRLSを有効化し、以下のようなポリシーを適用する：
+- 認証エラー
+- 権限エラー
+- 入力エラー
+- ネットワークエラー
+- 予期しない保存エラー
 
-- `users`: 読み書き不可 (Supabase Authからのみ操作)。
-- `profiles`: `auth.uid() = id` のときのみ参照・更新許可。
-- `materials`、`spice_blends`、`recipe_bases`、`trials` 等: `user_id = auth.uid()` のレコードのみ参照・更新を許可。ただし `visibility='public'` または `visibility='limited'` の場合は他ユーザーにも読み取りを許可。
-- `favorites`: `user_id = auth.uid()` のみ読み書き許可。
-- 外部キー制約とCASCADE削除により、ユーザー削除時に関連データも削除される。
+詳細なAPI Error Contractは [Supabase Data Access & Error Contract](supabase-data-access-error-contract.md) で定義する。
+
+### 3.5 RLSポリシー
+
+v1では全データを非公開とし、認証ユーザー本人のみが自分のデータを参照・更新できる。公開・限定公開の読み取りポリシーは作成しない。
+
+- `research_lines`: `user_id = auth.uid()` のレコードのみ select / insert / update を許可する。deleteポリシーはv1では作成しない。
+- `trials`: `user_id = auth.uid()` のレコードのみ select / insert / update を許可する。deleteポリシーはv1では作成しない。
+- `trial_ingredients`: 親の `trials.user_id = auth.uid()` が成立する場合のみ select / insert / update / delete を許可する。材料行のdeleteは `save_trial_with_ingredients` RPC内の全置換処理で使用する。
+- `trial_stars`: `user_id = auth.uid()` のレコードのみ select / insert / delete を許可する。
+- `save_trial_with_ingredients` と `clone_trial` RPC は `security definer` を使用する場合でも、内部で必ず `auth.uid()` と対象レコードの所有者を照合する。
+- RLSテストでは、ユーザーAがユーザーBの研究ライン、試行、材料行、スターを読めないことを確認する。
 
 ## 4. 画面設計
 
-UXは研究記録を円滑に行うことを最優先とし、初期表示は軽量化、必要なときに詳細項目を展開する「プログレッシブディスクロージャ」を採用。
-
-### 4.1 画面一覧
+v1の画面は、研究ログを素早く保存し、前回の試行を複製して少し変える体験に集中する。写真、カレンダー、比較画面、系譜グラフ、設定の高度なカスタマイズはv1では扱わない。
 
 | 画面ID | 名称 | 主なコンポーネント |
 |---|---|---|
-| **H1** | ホーム | ヘッダー(ロゴ・設定アイコン)、「前回を再現」ボタン、最近の試行リスト、定番レシピエリア、研究中のレシピライン一覧、検索ボックス、フッター。
-| **R1** | レシピベース一覧 | カード形式で名前・タグ・試行件数を表示。新規作成ボタン、フィルタ(タグ、公開設定)。
-| **R2** | レシピベース詳細 | ベース概要、タグ、試行タイムライン、派生ライン(系譜リンク)、ベース編集/削除。
-| **T1** | 試行入力フォーム | ベース選択ドロップダウン、複製元選択、基本項目入力欄、詳細項目切替ボタン、カスタム項目追加ボタン、プリセット呼び出し、写真アップロード、保存/下書きボタン、キャンセル。
-| **T2** | 試行詳細ビュー | 試行名、日付、レシピベース名、親試行リンク、材料リスト(表)、詳細属性(カード)、評価チャート、写真カルーセル、メモ、次回狙い、スター/お気に入り/定番昇格ボタン、編集ボタン。
-| **T3** | 試行履歴リスト | フィルタ(レシピベース、日付、評価、スター)、並べ替え(最近順、評価順)、リスト表示またはカード表示。カレンダービューへの切替ボタン。
-| **T4** | カレンダービュー | 月/週/日単位で試行件数をマーカー表示。クリックで該当日の試行リストへ遷移。
-| **C1** | 比較ビュー | 上部で比較対象を選択(親と子を提案)、差分表(材料・工程・評価)、差分ハイライト色分け、比較結果のエクスポートボタン。
-| **B1** | 系譜ビュー | 選択したレシピベースまたは試行から、親子関係を横方向にノードと線で表示。各ノードはクリックで詳細を表示し、複製・派生ボタンを提供。ノードの色・アイコンでスターや定番ステータスを表現。
-| **S1** | 設定/カスタマイズ | ユーザープロフィール、入力項目の表示順設定、カスタム項目管理、テンプレート管理、データエクスポート、アプリテーマ(ライト/ダーク)切替。
+| **A1** | 認証画面 | Magic Link用メール入力、送信、送信後案内、認証エラー表示 |
+| **H1** | ホーム | 直近の試行、「前回を複製」ボタン、研究ライン一覧、最近の試行 |
+| **L1** | 研究ライン一覧 | 研究ラインカード、新規作成、編集、アーカイブ |
+| **L2** | 研究ライン詳細 | ライン概要、試行一覧、新規試行ボタン |
+| **T1** | 試行入力フォーム | 研究ライン選択、材料行入力、基本評価、メモ、次回の狙い、保存、下書き |
+| **T2** | 試行詳細 | 試行内容、材料行、親試行リンク、複製ボタン、スター、編集 |
+| **T3** | 試行履歴 | 最新順リスト、研究ライン絞り込み、スター絞り込み |
+| **S1** | 最小設定 | ログアウト、下書き管理、将来のエクスポート導線 |
 
-### 4.2 画面フロー
+v1ではC1比較ビュー、B1系譜ビュー、カレンダービューは作成しない。
 
-1. **初期起動**: セッションが無ければログイン画面を表示。Magic Link 送信 → メールからリンク開き認証完了。
-2. **ホーム表示**: 「前回を再現」ボタンを強調。未入力の下書きがある場合は「続きから入力」ボタンも表示。
-3. **新規試行**: ホームまたはレシピベース詳細から「新しい試行」ボタンを押すとT1。ベース選択→材料プリセット選択→スパイスブレンド追加→数量調整→評価入力→保存。
-4. **複製試行**: T2から「複製して新規作成」ボタン→T1に遷移し、差分編集。
-5. **比較**: T2または試行リストから2件選択し、C1を表示。差分ハイライトを確認し、必要に応じて関連メモや次回改善案を書く。
-6. **系譜参照**: レシピベース詳細から「系譜を見る」リンク→B1。ノードクリックで詳細表示および派生開始。
-7. **お気に入り/定番設定**: T2でスターアイコンを押すとスター追加。お気に入りボタンを押すとお気に入り一覧に登録。定番昇格ボタンを押すとベース化してR2に反映。
+### 4.1 画面フロー
 
-### 4.3 入力UI設計
+1. 未ログインの場合はログイン画面を表示する。
+2. 初回ログイン後、研究ラインがない場合は研究ライン作成へ誘導する。
+3. 研究ライン作成後、最初の試行入力へ誘導する。
+4. 既存試行がある場合、ホームで直近試行の複製を主要アクションとして表示する。
+5. 試行詳細では、親試行リンク、複製、編集、スターを提供する。
 
-- **基本項目**は常時表示。`amount` は数値＋単位ドロップダウン (g/ml/個)。`overall_rating` は5段階レーティングバー。
-- **詳細項目**はアコーディオンで折りたたみ。ユーザーが詳細入力モードをONにすると展開。
-- **カスタム項目**追加はモーダルで実装。項目名、説明、値の型(数値/テキスト/選択肢)を入力し、テンプレートとして保存する機能。
-- **プリセット呼び出し**はモーダル内で一覧から選択。選択後に数量調整スライダーで微調整。
-- **ステータス切替**はセレクトボックスまたはトグルボタン(Private / Limited / Public)。
+### 4.2 入力UI設計
 
-## 5. オフライン同期の詳細
+- フォームはモバイル1カラムを基本とする。
+- 材料行はカテゴリ、名称、量、単位を1行単位で入力する。
+- 詳細項目は煮出し時間、沸騰回数、こし方に限定する。
+- 写真、公開設定、カスタム項目は表示しない。
+- 保存失敗時は入力内容を保持し、再試行できるようにする。
 
-- IndexedDB で `offline_trials` テーブルを保持。試行登録時にネットワーク状態を検出し、オフラインならDBに保存。オンライン時にバックグラウンドでSupabaseへ送信し、成功したらローカルデータを削除。同期失敗時はユーザーに通知。
-- Service Worker でAPIリクエストをフックし、失敗時にローカルキャッシュへ格納。オンライン時に再送を試みる。
-- 画面に「同期待ちリスト」バッジを表示し、同期が完了すると消える。
+## 5. オフライン対応
+
+v1ではオフライン自動同期を実装しない。ネットワーク切断時にサーバー保存をキューへ積み、オンライン復帰後に自動再送する機能は対象外とする。
+
+v1で扱うのは、入力中データの軽量なローカル下書きのみである。
+
+- 下書きは同一端末・同一ブラウザ内に保存する。
+- 下書きはユーザーが明示的に破棄できる。
+- 下書き復元時には、保存されていない内容であることをUIで明示する。
+- オンライン復帰時の自動送信は行わない。
+- 複数端末間の同期、競合解決、再送管理はv2以降で別途設計する。
 
 ## 6. 認証・権限設計
 
-- Supabase Auth を使用して Magic Link 認証。ソーシャルログインは v2以降の検討項目。
-- 認証状態は React Context で保持し、非ログイン時はログイン画面へリダイレクト。
-- RLS によってユーザーデータのプライバシーを確保。公開設定が `public` の試行/レシピのみ他ユーザーが閲覧できる。
-- APIルートのレスポンスは認証ユーザーに紐付くデータのみ返すよう、Supabaseの`rpc`関数やEdge Function側で二重チェックを実施。
+- Supabase Auth の Magic Link を使用する。
+- 認証状態はSupabase Clientから取得する。
+- 非ログイン時はログイン画面へ誘導する。
+- v1の全データは非公開であり、他ユーザーのデータを読むUIやAPIは存在しない。
 
 ## 7. エラーハンドリングとフィードバック
 
-- UI層でネットワークエラーや認証エラーを検出し、トースト通知やモーダルでユーザーに知らせる。エラー状態はステートに保持し再試行ボタンを提供。
-- フォームバリデーションは、必須項目の未入力や数値範囲をリアルタイムで検出。Zodなどのスキーマバリデーションライブラリを使用。
-- APIから返るHTTPステータスを統一：400系は入力エラー、401は認証エラー、403は権限エラー、404は存在しないリソース、500はサーバーエラー。UIは各ケースに応じた文言を用意。
+- フォームバリデーションはZodで行う。
+- 必須項目、数値範囲、材料行の不足を保存前に検出する。
+- 保存失敗時は入力内容を保持する。
+- 認証切れの場合はログインへ誘導する。
+- 権限エラーは「対象のデータを表示できません」と表示し、詳細なIDや内部情報は表示しない。
 
 ## 8. ロギング・監視
 
-- クライアント: ユーザーの操作ログ（試行作成や比較閲覧）はGoogle AnalyticsやAmplitudeで匿名収集しUX改善に利用。個人情報は含めない。
-- サーバー: Supabase Edge Functions および Cloudflare Functions のログをDashbordで閲覧。エラー時はSlack/Webhookに通知。
-- パフォーマンス監視: Web Vitals API とNext.jsの built-in analyticsを利用し、起動時間やインタラクション遅延を測定。
+v1では外部Analyticsを導入しない。個人研究ログの内容を外部分析サービスへ送らない。運用上必要なエラー確認は、Cloudflare PagesとSupabaseの標準ログで行う。
 
 ## 9. デプロイ・運用
 
-- GitHub リポジトリにmainブランチを配置し、pull request はCI/CDでテスト→lint→buildを実行。
-- Cloudflare Pages へデプロイする際、月500ビルドの上限に達しないようブランチ制御。プレビュー環境はPRごとに自動生成。
-- Supabaseはプロジェクト毎に `dev` と `prod` 環境を作成。Freeプランの制約を超えそうになったらProプランへの移行を検討。DBスキーマ変更はSupabase Migrationsを使用。
+- GitHubのmainブランチを本番デプロイ対象とする。
+- Pull Requestではlint、typecheck、test、buildを実行する。
+- Cloudflare Pagesへ静的アプリとしてデプロイし、Next.js静的出力、認証リダイレクト、環境変数、固定ルート方針は [Deployment Contract](deployment-contract.md) に従う。
+- DBスキーマ変更はSupabase migrationsで管理し、[DB Migration & RLS Policy](db-migration-rls-policy.md) に従う。
+- migrationにはRLSとテスト観点を必ず含める。
 
 ## 10. テスト戦略
 
-- **単体テスト:** Reactコンポーネント、ユーティリティ関数、RLSポリシーの検証。Jest と React Testing Library。
-- **APIテスト:** End-to-EndテストでSupabase Edge FunctionsとNext.js API routesを対象にHTTPリクエスト/レスポンスを検証。Supertest 等を利用。
-- **E2Eテスト:** Cypress または Playwright でユーザーフローを実行。オフラインモードやキャッシュの動作もテスト対象。
-- **パフォーマンステスト:** Lighthouse CI でPWAとしての基準 (スコア80以上) を確認。
+- **単体テスト:** バリデーション、表示ロジック、複製関連のユーティリティを対象とする。
+- **RLSテスト:** ユーザーAがユーザーBの研究ライン、試行、材料行、スターを読めないことを確認する。
+- **UIテスト:** Playwrightで主要画面のモバイル・デスクトップ表示を確認する。
+- **E2Eテスト:** ログイン後の研究ライン作成、試行作成、複製、スター切替を確認する。
 
 ## 11. 移行・拡張計画
 
-- **画像ストレージ拡張:** Supabase Storageの1GB制限を超える場合はCloudflare R2へ切り替え。初期実装ではSupabase Storage用のラッパークラスを用意し、R2に変更する際もURL生成やアクセス権限処理を差し替えるだけで済むようにする。
-- **公開機能の追加:** v2で公開・限定公開を実装するときは、公開試行と非公開試行を別テーブルに分けるか、RLSポリシーで細かく制御する。公開ページは静的生成可能な構造にし、Cloudflare Pages Functions でSSRする場合はキャッシュ戦略を再検討する。
-- **AI提案機能:** ユーザーの過去試行データから次に試すべき材料や手順を提案する場合、Supabase Edge Functions と外部AIサービス(LLM API)を接続。個人データを外部に送る際は明示的な同意を得る。
-- **マルチデバイス同期:** モバイルとデスクトップ間で無停止同期できるよう、Realtime APIの採用を検討。パフォーマンスへの影響やFreeプランの制約を考慮しつつ実験する。
+v1で継続利用が確認できた後、次の順で拡張を検討する。
 
-## 12. 補足: 技術選定理由
+1. 親子2件に限定した比較表示
+2. カレンダーまたは簡易統計
+3. 写真アップロード
+4. カスタム項目
+5. 定番化した試行の管理
+6. 簡易系譜ビュー
+7. 公開・限定公開
+8. AI提案
+9. SNS要素
 
-- **Cloudflare Pages:** 無料プランでも無制限の帯域幅とグローバルエッジ配信が利用できる。500ビルド/月・1同時ビルド制限に留意しつつ、個人開発規模では十分。静的アセットの20,000ファイル制限と25MiBファイルサイズ制限はPWA構成に適合。
-- **Supabase:** Freeプランで50k MAU・500MB DB・1GB Storage・5GB egressと充実。RLSによるセキュアなデータ分離が容易で、PostgreSQLを直接扱える柔軟性が高い。
-- **Next.js PWA:** クロスプラットフォーム開発を1コードベースで実現。App Routerの`app/manifest.ts` によるWeb App Manifest生成やサービスワーカー登録などPWA機能を簡潔に実装できる。
-- **Workbox:** Cache戦略やサービスワーカー管理を簡素化し、App Shellパターンとキャッシュ更新を安全に実現。
+これらはv1のDBやUIに先回りして実装しない。拡張時は要件定義、詳細設計、RLS、[MVP Scope Contract](mvp-scope-contract.md)、受け入れ基準を更新してから実装する。
 
-## 13. 結論
-本詳細設計書では、要件定義で掲げた「チャイ研究特化の研究ノート」を実現するために、システム構成から画面設計、データベーススキーマ、API設計、オフライン対応、認証・権限、テスト・運用計画に至るまで具体的に記述した。特に以下の点を重視している：
+## 12. 結論
 
-* **研究ログを主役とする情報構造**：完成レシピではなく試行単位の記録を中心に設計し、ベースレシピから派生する系譜と比較機能を充実させた。これによりユーザーは自分の好みを系統立てて発見できる。
-* **柔軟かつシンプルな入力体験**：基本項目・詳細項目・カスタム項目の三層構造により、初めてのユーザーでも迷わず記録を開始でき、研究が深まるほど入力内容を広げられる。プリセットや評価テンプレートにより再利用性を高め、入力の負荷を軽減した。
-* **高いモバイル体験とオフライン対応**：Next.js PWAとWorkboxによるApp Shellパターン、キャッシュ戦略、オフライン同期により、帯域や接続状況に左右されない操作性を提供する。これはCloudflare Pagesのエッジ配信と組み合わせて高速なUXを実現する。
-* **セキュアでスケーラブルなバックエンド**：SupabaseとPostgreSQLを採用し、RLSでユーザーごとにデータを保護しながら公開・限定公開も実現できる構成とした。無料プランの制約（DB容量、Storage容量、アクティブプロジェクト数など）を考慮し、将来のスケーリングやCloudflare R2への移行も視野に入れた。
-* **堅牢なテスト・運用体制**：単体・API・E2Eテストやパフォーマンス監視を含むテスト戦略、CI/CDによる自動デプロイ、ログ監視とアラートにより、高品質を維持しながら開発速度を保てるようにした。
+本詳細設計書は、チャイ研究アプリv1を非公開の個人研究ログとして実装するための最小設計を定義した。v1の実装対象は、認証、研究ライン、試行、材料行、複製、履歴、スター、軽量下書き、RLSに限定する。
 
-これらの設計要素により、チャイ研究に必要な自由度と利便性をバランスよく提供することができる。本ドキュメントをもとに実装を進め、ユーザーテストを経てフィードバックを反映させることで、チャイ愛好家にとって不可欠な研究ツールを完成させることを期待する。
+公開、写真、比較、系譜、カスタム項目、AI、オフライン自動同期はv1では扱わない。これにより、初期実装の安全性、継続運用性、Codexによる実装再現性を優先する。
