@@ -49,8 +49,8 @@
 
 ## 停止条件
 
-- AI自己監査結果: 計画レビューとして通過。実装前に、M2-01の検証/証跡土台、M2-02の`research_lines`閉単位、M2-09の横断検証、M2-11の自己監査記録を必須ゲートにした。
-- 残る停止条件: 実DB変更未着手、非本番検証未実施、`supabase/` migration基盤未作成、A/B/anon/direct CRUDの実検証未実施、actor A/B/anonの切替方法未固定。
+- AI自己監査結果: 計画レビューとして通過。実装前に、M2-01の検証/証跡土台、M2-02の`research_lines`最初のend-to-end DB slice、M2-09の横断検証、M2-11の自己監査記録を必須ゲートにした。
+- 残る停止条件: 実DB変更未着手、非本番検証未実施、`supabase/` migration基盤未作成、A/B/anon/direct CRUDの実検証未実施、actor A/B/anonの切替方法未固定、M2-01の補助証跡はあるが実slice適用は未着手。
 - 次に止める条件: `research_lines` をDDLだけで完了扱いにする案、`trials` / `trial_ingredients` のdirect CRUD拒否をgrepだけで済ませる案、`deleted_at` 除外をData Accessだけに寄せる案、RPCをM2でまとめて着手する案。
 
 ## 完了判断
@@ -58,4 +58,4 @@
 - 完了扱いにできる理由: 今回の役割であるM2-00レビューとして、作業分割、依存関係、完了条件、停止条件、検証、証跡方針、最初の実装単位を文書へ反映できたため。
 - 大きなコード変更の場合のCI結果: 対象外。
 - 軽微変更の場合にpush/CI監視を省略した理由: docs-onlyの計画レビューで、現時点ではローカルdocsチェックを完了条件にするため。
-- 後続で見直す条件: 非本番DB検証方式が実repo構成やSupabase local運用と衝突する場合、または`research_lines` を最初の閉単位にできない新しい文書根拠が出た場合。
+- 後続で見直す条件: 非本番DB検証方式が実repo構成やSupabase local運用と衝突する場合、または`research_lines` を最初のend-to-end DB sliceにできない新しい文書根拠が出た場合。
