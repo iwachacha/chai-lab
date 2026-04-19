@@ -1,6 +1,7 @@
 -- M2 DB slice verification template
 -- This file is not a migration.
 -- Use only against local or separated non-production.
+-- For local actor switching, bootstrap `sql/local-db-auth-harness.sql` first.
 -- Replace placeholder values before execution and keep the used SQL path in worklog / PR evidence.
 -- Expected-failure write probes should be wrapped in BEGIN / ROLLBACK.
 
@@ -33,26 +34,37 @@ WHERE routine_schema = 'public'
 
 -- Actor A expected-success probe
 BEGIN;
--- Set Actor A context here according to the chosen non-production verification method.
+RESET ROLE;
+-- Default local harness:
+-- SET ROLE authenticated;
+-- SELECT set_config('request.jwt.claim.sub', '<ACTOR_A_UUID>', false);
 -- <ACTOR_A_SUCCESS_SQL>
 ROLLBACK;
 
 -- Actor B expected-rejection probe
 BEGIN;
--- Set Actor B context here.
+RESET ROLE;
+-- Default local harness:
+-- SET ROLE authenticated;
+-- SELECT set_config('request.jwt.claim.sub', '<ACTOR_B_UUID>', false);
 -- <ACTOR_B_REJECTION_SQL>
 ROLLBACK;
 
 -- anon expected-rejection probe
 BEGIN;
--- Set anon context here.
+RESET ROLE;
+-- Default local harness:
+-- SET ROLE anon;
+-- SELECT set_config('request.jwt.claim.sub', '', false);
 -- <ANON_REJECTION_SQL>
 ROLLBACK;
 
 -- trim save / trim duplicate probe
 BEGIN;
--- Run only when the slice has trim persistence or trim-based uniqueness.
--- <TRIM_SAVE_SQL>
+RESET ROLE;
+-- Run only when the slice has trim persistence, trim-based uniqueness,
+-- or raw untrimmed input rejection at the DB boundary.
+-- <TRIM_BOUNDARY_SQL>
 -- <TRIM_DUPLICATE_SQL>
 ROLLBACK;
 

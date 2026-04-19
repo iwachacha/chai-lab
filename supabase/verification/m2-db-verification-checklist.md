@@ -11,6 +11,7 @@
 - N/Aにする検証観点と理由:
 - 非本番検証先:
 - Actor A / Actor B / anon の準備状況:
+- Actor切替方法:
 - 参照する手順書:
 - 参照するSQL:
 - 補助証跡ファイル:
@@ -22,7 +23,7 @@
 |---|---|---|
 | A/Bユーザー分離 | すべてのDB slice | なし |
 | anon拒否 | すべてのDB slice | なし |
-| trim保存 / trim前提の重複確認 | trim保存値、trim後unique、trim前提入力契約を持つslice | trim保存契約もtrim後unique契約も持たない |
+| trim正規化境界 / trim前提の重複確認 | trim後保存値、trim後unique、未trim値拒否など、trim前提入力契約を持つslice | trim保存契約もtrim後unique契約も未trim値拒否契約も持たない |
 | `deleted_at IS NULL` 前提の通常取得除外 | `deleted_at` を持つslice、またはactive trial前提で参照・集計するslice | `deleted_at` を持たず、active trial前提にも依存しない |
 | direct CRUD拒否 | v1契約で直接書き込みを禁止するslice。少なくとも `trials` と `trial_ingredients` | v1契約で直接table writeが許可されている。例: `research_lines` の insert/update、`trial_stars` の insert/delete |
 | 想定経路の成功 | すべてのDB slice | なし |
@@ -63,7 +64,8 @@
 
 ### 3.5 trim 保存 / trim重複
 
-- [ ] trim保存が契約に含まれるsliceでは、前後空白付き入力の保存値を確認した
+- [ ] trim前提契約を持つsliceでは、前後空白付き生入力に対する境界を記録した
+- [ ] 前後空白付き生入力の挙動が、保存値への正規化かDB拒否のどちらかで確認できた
 - [ ] trim後重複禁止が契約に含まれるsliceでは、重複拒否を確認した
 - [ ] 該当しない場合はN/A理由を残した
 
@@ -111,6 +113,6 @@
 
 ## 6. 補足
 
-- `research_lines` はdirect CRUD全面拒否の対象ではありません。v1契約で本人のinsert / updateは直接許可されます。ただし、物理delete不可とtrim / 重複 / archive挙動は検証対象です。
+- `research_lines` はdirect CRUD全面拒否の対象ではありません。v1契約で本人のinsert / updateは直接許可されます。ただし、物理delete不可、trim前提の生入力拒否または正規化、trim / 重複 / archive挙動は検証対象です。
 - `trials` と `trial_ingredients` はdirect CRUD拒否が必須です。将来のRPC導線を先回り実装せず、DB権限と負の検証で止めます。
 - `trial_stars` は本人未削除trialへの直接insert / deleteを許可するため、direct CRUD拒否の代わりに「許可された直接操作の境界」を確認します。
