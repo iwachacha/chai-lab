@@ -1,4 +1,4 @@
-﻿# M0 Readiness Gate
+# M0 Readiness Gate
 
 **作成日:** 2026-04-19
 **目的:** AIがM1へ進むために満たすM0準備完了ゲートを定義する。

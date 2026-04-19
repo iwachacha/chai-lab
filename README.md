@@ -9,7 +9,9 @@ v1は、公開レシピサービスやSNSではなく、非公開の個人研究
 | 文書 | 役割 |
 |---|---|
 | [docs/pj-policy.md](docs/pj-policy.md) | プロジェクト方針、開発姿勢、ベンダー的判断基準。 |
-| [docs/autonomous-project-governance.md](docs/autonomous-project-governance.md) | AI自律判断、AI自己監査、人間確認範囲の最上位運用モデル。 |
+| [docs/agent-relationship-governance.md](docs/agent-relationship-governance.md) | AI自律判断、AI自己監査、人間確認範囲の最上位運用モデル。 |
+| [docs/agent-workflow.md](docs/agent-workflow.md) | 実装前、危険変更前、停止時、エスカレーション時のAI作業手順。 |
+| [docs/agent-relationship-governance-decision.md](docs/agent-relationship-governance-decision.md) | 関係性ガバナンスをどの形式で正式化するかの判断記録。 |
 | [docs/mvp-scope-contract.md](docs/mvp-scope-contract.md) | v1で実装するもの・しないものの最終スコープ契約。 |
 | [docs/app-proposal.md](docs/app-proposal.md) | 企画、コンセプト、市場背景、ロードマップ。 |
 | [docs/app-rdd.md](docs/app-rdd.md) | v1要件定義。 |

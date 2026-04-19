@@ -4,7 +4,7 @@
 
 この文書は、チャイ研究アプリv1におけるDB migration、RLS、DB変更レビューの方針を定義する。v1の全業務データは非公開であり、RLS不備は重大事故として扱う。
 
-**運用注記:** DB/RLS/RPCの危険領域では、従来の人間レビュー前提を `docs/autonomous-project-governance.md` のAI自己監査ゲートへ読み替える。監査内容は弱めず、設計妥当性、権限境界、影響範囲、代替案比較、テスト条件、証跡記録、停止条件をAIが満たす。
+**運用注記:** DB/RLS/RPCの危険領域では、`docs/agent-relationship-governance.md` のAI自己監査ゲートと `docs/agent-workflow.md` の危険変更workflowを適用する。監査内容は弱めず、設計妥当性、権限境界、影響範囲、代替案比較、テスト条件、証跡記録、停止条件をAIが満たす。
 
 ## 1. 基本方針
 

@@ -4,7 +4,7 @@
 
 この文書は、チャイ研究アプリv1をCodexまたはAIエージェントで実装・修正する際の実行ルールを定義する。Codexは単なる実装代行ではなく、品質、安全性、整合性、継続運用性を守る開発パートナーとして振る舞う。
 
-**運用注記:** 判断主体とエスカレーション範囲は `docs/autonomous-project-governance.md` を優先する。Codexは依頼者に技術承認を求める前に、文書根拠、v1整合、安全性、単純性、可逆性、監査可能性に基づいて推奨案を1つに絞り、自律的に進める。人間確認はスコープ変更、外部契約、本番データ、不可逆操作、純粋なプロダクト方針選択に限定する。
+**運用注記:** 判断主体とエスカレーション範囲は `docs/agent-relationship-governance.md` を優先し、実装前、危険変更前、停止時、エスカレーション時の手順は `docs/agent-workflow.md` に従う。Codexは依頼者に技術承認を求める前に、文書根拠、v1整合、安全性、単純性、可逆性、監査可能性に基づいて推奨案を1つに絞り、自律的に進める。人間確認はスコープ変更、外部契約、本番データ、不可逆操作、純粋なプロダクト方針選択に限定する。
 
 ## 1. 最優先原則
 
@@ -31,6 +31,7 @@ Codexは、実装対象に応じて以下を確認する。
 | Supabase操作 | `docs/supabase-data-access-error-contract.md` |
 | 技術選定 | `docs/tech-stack.md` |
 | デプロイ / ルーティング | `docs/deployment-contract.md` |
+| AI判断・作業手順 | `docs/agent-relationship-governance.md`, `docs/agent-workflow.md`, `docs/codex-execution-rules.md` |
 | 開発姿勢 | `docs/pj-policy.md`, `docs/codex-execution-rules.md` |
 
 ## 3. 実装してよい変更
@@ -102,7 +103,7 @@ DB変更を行う場合、Codexは以下を守る。
 
 DB変更だけ行い、RLSやテスト観点を後回しにしてはならない。
 
-DB、RLS、grant/revoke、`security definer`、RPC、認可境界Data Accessに触れる場合は、人間承認待ちではなくAI自己監査ゲートを通す。設計妥当性、権限境界、影響範囲、代替案比較、テスト条件、証跡記録、停止条件をAI自身が満たすまで、該当依存タスクを完了扱いにしない。
+DB、RLS、grant/revoke、`security definer`、RPC、認可境界Data Accessに触れる場合は、人間承認待ちではなくAI自己監査ゲートを通す。`docs/agent-workflow.md` の危険変更workflowに従い、設計妥当性、権限境界、影響範囲、代替案比較、テスト条件、証跡記録、停止条件をAI自身が満たすまで、該当依存タスクを完了扱いにしない。
 
 ## 7. Supabase操作ルール
 
@@ -173,7 +174,7 @@ Codexは、変更種別に応じて以下を実行または提案する。
 | Supabase操作・エラー変更 | `supabase-data-access-error-contract.md` |
 | 技術スタック変更 | `tech-stack.md` |
 | デプロイ、環境変数、認証リダイレクト、ルーティング変更 | `deployment-contract.md` |
-| Codex運用変更 | `codex-execution-rules.md`, `pj-policy.md` |
+| AI関係性・作業手順・Codex運用変更 | `agent-relationship-governance.md`, `agent-workflow.md`, `codex-execution-rules.md`, `pj-policy.md` |
 
 文書更新なしに、スコープ、DB、RLS、画面、外部サービス、技術スタックを変更してはならない。
 

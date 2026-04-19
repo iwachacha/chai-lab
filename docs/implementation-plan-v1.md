@@ -1,10 +1,10 @@
-﻿# チャイ研究アプリ v1 実装計画書
+# チャイ研究アプリ v1 実装計画書
 
 **作成日:** 2026-04-19
 **位置づけ:** v1実装計画の最新版
 **対象:** v1実装の安全性、具体性、検証可能性、責務分離、スコープ厳守の改善
 
-**運用注記:** 本計画は `docs/autonomous-project-governance.md` のAI自律判断モデルで運用する。危険領域はAI自己監査ゲートで扱い、人間確認は実Supabase project、Production URL、secret、Preview/Production接続、本番データ、外部サービス契約、v1スコープ変更に限定する。M0の詳細は `docs/m0-readiness-gate.md` と `docs/m0-decision-matrix.md` を正とする。
+**運用注記:** 本計画は `docs/agent-relationship-governance.md` のAI自律判断モデルで運用する。危険領域はAI自己監査ゲートで扱い、人間確認は実Supabase project、Production URL、secret、Preview/Production接続、本番データ、外部サービス契約、v1スコープ変更に限定する。M0の詳細は `docs/m0-readiness-gate.md` と `docs/m0-decision-matrix.md` を正とする。
 
 ## 1. 目的と前提
 
@@ -36,7 +36,8 @@
 - `docs/deployment-contract.md`
 - `docs/codex-execution-rules.md`
 - `README.md`
-- `docs/autonomous-project-governance.md`
+- `docs/agent-relationship-governance.md`
+- `docs/agent-workflow.md`
 - `docs/m0-readiness-gate.md`
 - `docs/m0-decision-matrix.md`
 
@@ -355,7 +356,7 @@ AIは次を確認する。
 - 優先度/サイズ: P0 / S
 - 目的: DB/RLS/RPC/security definer変更をAI自己監査なしで通さない。
 - 対応レイヤー: Docs / DB / RLS / RPC
-- 参照文書: db-migration-rls-policy、autonomous-project-governance
+- 参照文書: db-migration-rls-policy、agent-relationship-governance
 - 着手条件: M0-01完了
 - 具体作業: 自己監査対象、自己監査記録、前提資料、不通過時に止める作業を固定する。
 - 自己監査要否: 必須
@@ -464,7 +465,7 @@ AIは次を確認する。
 - 優先度/サイズ: P0 / S
 - 目的: M2のDB変更を巨大migrationにしない。
 - 対応レイヤー: DB / RLS / Docs
-- 参照文書: db-migration-rls-policy、autonomous-project-governance
+- 参照文書: db-migration-rls-policy、agent-relationship-governance
 - 着手条件: M0-04、M0-05完了
 - 具体作業: DDL、index、helper、RLS enable、policy、grant/revoke、検証を別タスク/別論理変更に分け、レビュー順を決める。
 - 自己監査要否: 必須
@@ -614,7 +615,7 @@ AIは次を確認する。
 - 優先度/サイズ: P0 / L
 - 目的: M2内で全4業務テーブルの安全性を実行確認する。
 - 対応レイヤー: RLS / DB / Test
-- 参照文書: db-migration-rls-policy、codex-execution-rules、autonomous-project-governance
+- 参照文書: db-migration-rls-policy、codex-execution-rules、agent-relationship-governance
 - 着手条件: M2-09完了
 - 具体作業: 4テーブルそれぞれでRLS有効化、policy、grant/revoke、anon拒否、ユーザーA/B分離、想定外直接CRUD拒否、想定経路の成功を検証する。
 - 自己監査要否: 必須
@@ -629,7 +630,7 @@ AIは次を確認する。
 - 優先度/サイズ: P0 / S
 - 目的: M2のDB/RLS変更をAI自己監査で閉じる。
 - 対応レイヤー: DB / RLS / Docs
-- 参照文書: db-migration-rls-policy、autonomous-project-governance
+- 参照文書: db-migration-rls-policy、agent-relationship-governance
 - 着手条件: M2-10完了
 - 具体作業: DDL、index、helper、policy、grant/revoke、検証結果、direct CRUD検索結果、スコープ検索結果を自己監査資料にまとめる。
 - 自己監査要否: 必須
