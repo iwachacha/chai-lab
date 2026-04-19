@@ -4,6 +4,8 @@
 
 この文書は、チャイ研究アプリv1におけるSupabaseデータアクセスとエラー取り扱いの契約を定義する。v1では独自REST APIを作成せず、フロントエンドはSupabase Client、PostgreSQL、RLS、必要最小限のPostgres RPCを通じてデータを扱う。
 
+**運用注記:** RPC内部エラー識別子、AppError分類、Data Access責務の技術判断はAIが行う。RPC追加/変更時は、識別子、UI向け分類、RLS/所有者確認、direct CRUD禁止、部分保存なしをAI自己監査記録に残し、人間確認はv1スコープ変更、外部契約、本番データ、不可逆操作に限る。
+
 ## 1. 基本方針
 
 1. UIコンポーネントからSupabase Clientを直接呼び出さない。

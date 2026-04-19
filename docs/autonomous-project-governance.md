@@ -1,0 +1,199 @@
+# Autonomous Project Governance
+
+**作成日:** 2026-04-19
+**目的:** チャイ研究アプリv1の運用方針、判断構造、実装ガバナンスを「AI自律判断 + AI自己監査 + 限定的な人間エスカレーション」へ再定義する。
+
+## 1. 位置づけ
+
+この文書は、プロジェクト全体の判断モデルを定義する。v1の機能範囲、DB契約、RLS契約、受け入れ基準、静的デプロイ制約を弱めるものではない。変えるのは、技術判断の持ち主である。
+
+以後、既存文書内の `human review gate`、`human reviewer`、`project owner承認`、`承認記録がないと進めない` という表現は、原則としてこの文書の基準で読み替える。
+
+- 技術判断、設計妥当性、検証方式、エラー分類、作業記録方式はAIが決める。
+- 危険領域では人間承認待ちではなく、AI自己監査ゲートを完了条件にする。
+- 人間確認は、v1スコープ変更、外部契約、本番データ、不可逆運用、純粋なプロダクト方針選択に限定する。
+
+## 2. 維持するv1制約
+
+次の制約は変更しない。
+
+- v1は非公開の個人研究ログである。
+- 公開、限定公開、共有URL、SNS、写真、AI、比較、系譜、カスタム項目、オフライン同期はv1非対象である。
+- 試行本体と材料行の書き込みは、定義済みRPCに集約する。
+- `trials` と `trial_ingredients` の直接 insert / update / delete / upsert はアプリ経路で成立させない。
+- DB、RLS、UI、受け入れ基準がそろわない機能は実装しない。
+- RLS、権限境界、direct CRUD拒否、AppError契約、静的export制約を軽視しない。
+- `security definer` は `auth.uid()`、所有者確認、`search_path` 固定、PUBLIC revoke、必要ロールへのgrantを必須にする。
+
+## 3. 役割定義
+
+| 役割 | 位置づけ | 責務 |
+|---|---|---|
+| 依頼者 | プロダクト意図を示す非技術の依頼者 | 目的、優先順位、v1スコープ変更、外部サービス契約、本番運用判断を行う。日常的な技術承認者ではない。 |
+| AIエージェント | 技術責任を持つ自律実装者 | 技術設計、実装順序、DB/RLS/RPC安全判断、反論、代替案提示、自己監査、記録、局所停止を担う。 |
+
+依頼者は、RLS policy、SQLSTATE、migration分割、テスト方式、AppError分類、Data Access責務を逐一承認しない。AIが文書根拠と安全性に基づいて決定し、記録する。
+
+## 4. 旧問題の診断と統合結果
+
+今回の統合前に、人間承認前提または依頼者が技術判断者になっていた主な箇所と、現在の扱いは次である。
+
+| 文書 | 旧問題 | 新しい扱い |
+|---|---|---|
+| `docs/pj-policy.md` | AIの反論義務はあるが、AIの判断権限と人間確認範囲が明文化されていない。 | 本文書を上位運用として追加し、依頼者は技術承認者ではないと明示する。 |
+| `docs/codex-execution-rules.md` | ライブラリ追加、DB/RLS、文書更新で「提示」中心になっており、AIが安全側に決める範囲が弱い。 | 技術判断はAIが行い、スコープ変更や外部契約だけ人間へエスカレーションする。 |
+| `docs/db-migration-rls-policy.md` | 7章が旧来の人間確認前提になっていた。 | AI自己監査ゲートへ読み替える。監査内容は維持または強化する。 |
+| `docs/implementation-plan-v1-revised.md` | Q-01からQ-10、旧監査ゲート、各タスクのレビュー列、M1開始不可結論が人間判断待機に寄っていた。 | M1は自律開始可。危険領域は人間承認ではなくAI自己監査未達なら局所停止する。 |
+| 旧 `docs/implementation-plan-v1-remediation-map.md` | 監査指摘の解消がhuman review通過に結びついていた。 | 削除済み。criticalな検証条件は `docs/implementation-plan-v1-revised.md` へ統合し、通過主体をAI自己監査に置換する。 |
+| 旧 `docs/m0-decision-pack.md` | 10論点すべてを人間判断扱いにしていた。 | `docs/m0-open-questions-reframed.md` へ統合済み。Q-01のみ人間確認、Q-08はM8保留、残り8件はAI即決または仮決定へ再分類する。 |
+| 旧 `docs/m0-readiness-gate.md` | M1開始条件が承認記録と延期承認に依存していた。 | `docs/m0-readiness-gate-reframed.md` へ統合済み。M0をAI準備完了ゲートへ置換し、M1は静的基盤まで自律開始可とする。 |
+| 旧 `docs/m0-open-questions.md` | 目的が「人間判断が必要な未確定事項」になっていた。 | `docs/m0-open-questions-reframed.md` へ統合済み。4分類へ再整理する。 |
+
+## 5. 技術判断の原則
+
+AIは次を自律判断する。
+
+- 実装順序、作業分割、migration分割
+- DB/RLS/RPC設計の安全判断
+- `security definer` のhardening方針
+- grant/revoke、policy、Data Access責務
+- AppResult/AppError、RPC内部エラー識別子、UI表示用エラー分類
+- テスト戦略、RLS/RPC検証方式、未実施記録形式
+- 命名、記録方式、ログ禁止項目
+- UIの安全な最小構成
+- v1スコープ内での代替案選定
+
+判断基準は、優先順に v1整合、安全性、単純性、可逆性、監査可能性 とする。
+
+## 6. 人間確認が必要な範囲
+
+人間確認は次に限定する。
+
+- v1スコープを変更する場合
+- 公開、共有、課金、個人情報、法務、規約、外部サービス契約に触れる場合
+- Production環境、secret、外部project、billing、plan、URL登録を決める場合
+- 本番データの削除、破壊、復元不能な変更、不可逆運用を伴う場合
+- 複数案が同等に安全で、差が純粋にプロダクト方針、好み、優先順位である場合
+
+人間確認が必要な場合でも、AIは質問前に推奨案を1つに絞る。質問は最小化し、判断なしに危険になる作業だけ止める。
+
+## 7. 安全側仮決定ルール
+
+文書根拠だけでは一意に決まらないが、技術的に安全側を選べる場合、AIは仮決定して進める。
+
+仮決定では、次を記録する。
+
+| 記録項目 | 内容 |
+|---|---|
+| 仮決定 | 何を採用したか |
+| 優先軸 | v1整合、安全性、単純性、可逆性、監査可能性のどれを優先したか |
+| 根拠 | 参照した契約文書と既存設計 |
+| 避けたリスク | 採用しなかった案で起きる事故や複雑化 |
+| 見直し条件 | どの条件が来たら再判断するか |
+
+仮決定は、曖昧さを放置するためではなく、不要な承認待ちを避けつつ安全に前進するために使う。
+
+## 8. 反論義務
+
+AIは依頼内容が次に該当する場合、実装せずに反論する。
+
+- v1スコープ逸脱
+- RLS弱体化、権限事故、direct CRUD許可につながる
+- `security definer` の所有者確認やPUBLIC revokeを省く
+- 静的export構成と衝突する
+- DB/RPC/Data Access責務を混線させる
+- 将来機能の先回りカラム、UI、依存を追加する
+- 不要なライブラリ追加や過剰な抽象化を要求する
+- 生エラー、SQL、内部ID、認証情報、研究本文をUIやログへ出す
+
+反論時は、拒否理由、v1内の代替案、必要なら後続マイルストーンでの検討条件を提示する。
+
+## 9. AI自己監査ゲート
+
+`human review gate` は全面的に `AI自己監査ゲート` へ置換する。
+
+### 9.1 対象
+
+- migration追加/変更
+- DBスキーマ制約変更
+- RLS policy追加/変更
+- grant/revoke変更
+- `security definer` helper/RPC
+- RPC追加/変更
+- 認可境界に関わるData Access変更
+- AppError契約変更
+- Auth Redirect、env境界、静的export制約
+
+### 9.2 必須監査
+
+| 監査 | AIが満たす条件 |
+|---|---|
+| 設計妥当性レビュー | v1スコープ内、契約文書と整合、先回り機能なし |
+| 権限境界レビュー | owner確認、A/B分離、anon拒否、PUBLIC revoke、最小grant |
+| 影響範囲レビュー | table、column、index、policy、function、RPC、Data Access、UI、testを列挙 |
+| 代替案比較 | より安全で単純な案を選んだ理由を記録 |
+| テスト条件レビュー | direct CRUD拒否、RLS、RPC成功/失敗、部分保存なし、ログ禁止を確認 |
+| 証跡記録 | 採用案、検証結果、未実施、残リスク、次の停止条件をPR本文またはworklogへ記録 |
+| 停止条件確認 | 未達なら依存タスクだけ止め、全体停止にしない |
+
+### 9.3 通過条件
+
+AI自己監査ゲートは、次を満たしたときだけ通過する。
+
+1. 採用案と代替案比較がある。
+2. 権限境界と影響範囲が記録されている。
+3. 必須検証が実施済みである。
+4. 未実施がある場合、理由、代替確認、残リスク、止める範囲が明記されている。
+5. v1非対象機能が混入していない。
+6. 次マイルストーンへ渡す成果物が明確である。
+
+## 10. 停止条件
+
+停止は局所化する。
+
+| 条件 | 止める範囲 | 止めない範囲 |
+|---|---|---|
+| 実Supabase project、Production URL、secret未確認 | 実環境接続、Preview E2E、本番deploy | M1静的骨格、型、UI基盤 |
+| RLS検証未実施 | DB/RLSに依存するRPC、Data Access、UI | 非DBの静的UI基盤 |
+| direct CRUD拒否未確認 | 試行保存、材料保存、関連UI接続 | Auth、静的レイアウト |
+| `security definer` hardening未達 | 該当関数と依存RPC/UI | 無関係なUIや文書 |
+| AppError分類未達 | 該当RPCとUI接続 | RPCに依存しない画面 |
+| Backup/export未確認 | M8、本番deploy | M1からM7の実装 |
+| v1スコープ変更が必要 | その変更と依存実装 | 既存v1範囲の実装 |
+
+## 11. M0からM8の自律進行範囲
+
+| マイルストーン | AIが自律的に進める範囲 | 局所停止条件 |
+|---|---|---|
+| M0 | 方針、記録方式、検証方式、ゲート再定義 | なし。承認待ちで止めない。 |
+| M1 | 静的Next.js骨格、固定ルート、Auth Callback、env境界、AppResult/AppError、最小UI、npm scripts | 実Production/Preview接続、secret投入 |
+| M2 | 非本番/localでのDB/RLS基盤、4テーブル、policy、grant/revoke、RLS検証、研究ライン | AI自己監査またはRLS検証未達 |
+| M3 | save RPC、Trial Data Access、T1/T2基本 | RPC監査、direct CRUD拒否、部分保存なし検証未達 |
+| M4 | clone、soft delete、star、関連UI | security definer hardening、clone/star/soft delete検証未達 |
+| M5 | 履歴、絞り込み、JST日付境界、50件ページング | date境界テスト、他ユーザー/削除済み除外未達 |
+| M6 | 軽量local draft | 共有端末リスク表示、破棄導線、名前空間未達 |
+| M7 | unit/component/E2E、DB/RLS/RPC再実行、受け入れ確認 | critical検証未実施 |
+| M8 | build、env、Auth Redirect、backup/export、本番前確認 | Production env、backup/export、deploy確認の人間/運用確認未達 |
+
+## 12. 記録方針
+
+正式記録は、PRがある場合はPR本文とする。PR前またはAI単独作業ではdocs内worklogを使う。チャットだけを正式証跡にしない。
+
+記録には次を含める。
+
+- 採用案
+- 優先軸
+- 根拠文書
+- 避けたリスク
+- 実施した検証
+- 実施できなかった検証
+- 残リスク
+- 局所停止条件
+
+## 13. 既存文書との関係
+
+スコープや機能契約は既存文書を優先する。判断主体、承認待ち、レビュー運用について矛盾がある場合は、この文書と以下を優先して読む。
+
+- `docs/governance-refactor-plan.md`
+- `docs/m0-readiness-gate-reframed.md`
+- `docs/m0-open-questions-reframed.md`

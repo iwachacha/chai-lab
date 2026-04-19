@@ -2,6 +2,8 @@
 
 **作成日:** 2026-04-18
 
+**運用注記:** 役割と判断構造は [Autonomous Project Governance](autonomous-project-governance.md) を優先する。ユーザーは技術承認者ではなく依頼者であり、AIエージェントは技術設計、安全性判断、反論、代替案提示、AI自己監査を自律的に担う。
+
 本ドキュメントは、チャイ研究アプリの方向性と開発運営の基本方針を示す。v1では、非公開の個人研究ログとして、研究ライン、試行、複製、履歴、スターを安全に実装することを最優先する。
 
 ## 1. ビジョンと目的
@@ -92,7 +94,8 @@ UIでは「研究ライン」「試行」「元にした試行」「次回の狙
 | 文書 | 役割 |
 |---|---|
 | [MVP Scope Contract](mvp-scope-contract.md) | v1 MVPでやること・やらないことの最終判断。 |
-| [DB Migration & RLS Policy](db-migration-rls-policy.md) | DB変更、migration、RLSレビューの基準。 |
+| [Autonomous Project Governance](autonomous-project-governance.md) | AI自律判断、AI自己監査、人間確認範囲の最上位運用モデル。 |
+| [DB Migration & RLS Policy](db-migration-rls-policy.md) | DB変更、migration、RLS自己監査の基準。 |
 | [Screen-by-Screen Acceptance Criteria](screen-acceptance-criteria.md) | 画面ごとの受け入れ基準。 |
 | [Supabase Data Access & Error Contract](supabase-data-access-error-contract.md) | Supabase操作とエラー分類の契約。 |
 | [Codex Execution Rules](codex-execution-rules.md) | Codexによる実装時の実行ルール。 |

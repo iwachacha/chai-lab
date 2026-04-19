@@ -4,6 +4,8 @@
 
 この文書は、チャイ研究アプリv1をCloudflare Pagesへ静的Next.jsアプリとしてデプロイするための契約を定義する。v1ではNext.js API Routes、Cloudflare Pages Functions、SSRを使用しない。
 
+**運用注記:** 判断主体は `docs/autonomous-project-governance.md` を優先する。M1の静的骨格、固定ルート、env境界、Auth Callback実装はAIが自律的に進める。実Production URL、外部Supabase project、secret、Preview/Production接続、本番deployに触れる直前だけ、AIが推奨案を1つに絞って依頼者へ確認する。
+
 ## 1. 基本方針
 
 v1のフロントエンドは、静的にビルドされたNext.jsアプリとして配信する。データ操作はブラウザ上のSupabase Clientから行い、認可はSupabase PostgreSQLのRLSで担保する。
