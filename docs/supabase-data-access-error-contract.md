@@ -19,14 +19,14 @@
 
 実装では、機能ごとにデータアクセス関数を用意する。ファイル構成は実装時に決めてよいが、UIからは以下の責務を持つ関数群を呼び出す。
 
-| 領域 | 代表操作 |
-|---|---|
-| Auth | セッション取得、Magic Link送信、ログアウト |
-| Research Lines | 一覧取得、詳細取得、作成、編集、アーカイブ |
-| Trials | 一覧取得、詳細取得、作成、編集、論理削除、複製 |
-| Ingredients | `save_trial_with_ingredients` RPC内での材料行全置換 |
-| Stars | スター取得、付与、解除 |
-| Drafts | ローカル下書き保存、復元、破棄 |
+| 領域           | 代表操作                                            |
+| -------------- | --------------------------------------------------- |
+| Auth           | セッション取得、Magic Link送信、ログアウト          |
+| Research Lines | 一覧取得、詳細取得、作成、編集、アーカイブ          |
+| Trials         | 一覧取得、詳細取得、作成、編集、論理削除、複製      |
+| Ingredients    | `save_trial_with_ingredients` RPC内での材料行全置換 |
+| Stars          | スター取得、付与、解除                              |
+| Drafts         | ローカル下書き保存、復元、破棄                      |
 
 試行本体と材料行の書き込みは、`save_trial_with_ingredients`、`clone_trial`、`soft_delete_trial` に集約する。データアクセス層であっても、`trials` と `trial_ingredients` を直接 insert / update / delete しない。
 
@@ -37,9 +37,7 @@
 データアクセス関数は、原則として以下の形で結果を返す。
 
 ```ts
-type AppResult<T> =
-  | { ok: true; data: T }
-  | { ok: false; error: AppError };
+type AppResult<T> = { ok: true; data: T } | { ok: false; error: AppError };
 ```
 
 例外をUIまで伝播させない。予期しない例外も `UNKNOWN_ERROR` または `SERVER_ERROR` に正規化する。
@@ -48,34 +46,34 @@ type AppResult<T> =
 
 v1でUIが扱うエラーは以下に限定する。
 
-| code | 意味 | UI表示方針 |
-|---|---|---|
-| `AUTH_REQUIRED` | 未ログイン、セッションなし | ログインを促す。 |
-| `AUTH_EXPIRED` | セッション切れ | 再ログインを促す。 |
-| `FORBIDDEN` | RLSまたは権限により操作不可 | 「対象のデータを表示または変更できません」と表示する。 |
-| `NOT_FOUND` | 対象データが存在しない、またはRLSにより見えない | 存在しないか表示できない旨を表示する。 |
-| `VALIDATION_ERROR` | 入力値が不正 | 入力欄の近くに表示する。 |
-| `CONFLICT` | 重複、同時更新、親子関係不整合 | 再読み込みまたは入力修正を促す。 |
-| `NETWORK_ERROR` | 通信断、タイムアウト | 再試行導線を表示する。 |
-| `RATE_LIMITED` | 認証メール送信などの制限 | 時間をおいて再試行するよう伝える。 |
-| `SERVER_ERROR` | SupabaseまたはRPCで処理不能 | 入力を保持し、再試行または時間をおくよう伝える。 |
-| `UNKNOWN_ERROR` | 分類不能 | 入力を保持し、再試行導線を表示する。 |
+| code               | 意味                                            | UI表示方針                                             |
+| ------------------ | ----------------------------------------------- | ------------------------------------------------------ |
+| `AUTH_REQUIRED`    | 未ログイン、セッションなし                      | ログインを促す。                                       |
+| `AUTH_EXPIRED`     | セッション切れ                                  | 再ログインを促す。                                     |
+| `FORBIDDEN`        | RLSまたは権限により操作不可                     | 「対象のデータを表示または変更できません」と表示する。 |
+| `NOT_FOUND`        | 対象データが存在しない、またはRLSにより見えない | 存在しないか表示できない旨を表示する。                 |
+| `VALIDATION_ERROR` | 入力値が不正                                    | 入力欄の近くに表示する。                               |
+| `CONFLICT`         | 重複、同時更新、親子関係不整合                  | 再読み込みまたは入力修正を促す。                       |
+| `NETWORK_ERROR`    | 通信断、タイムアウト                            | 再試行導線を表示する。                                 |
+| `RATE_LIMITED`     | 認証メール送信などの制限                        | 時間をおいて再試行するよう伝える。                     |
+| `SERVER_ERROR`     | SupabaseまたはRPCで処理不能                     | 入力を保持し、再試行または時間をおくよう伝える。       |
+| `UNKNOWN_ERROR`    | 分類不能                                        | 入力を保持し、再試行導線を表示する。                   |
 
 ## 5. `AppError`形式
 
 ```ts
 type AppError = {
   code:
-    | 'AUTH_REQUIRED'
-    | 'AUTH_EXPIRED'
-    | 'FORBIDDEN'
-    | 'NOT_FOUND'
-    | 'VALIDATION_ERROR'
-    | 'CONFLICT'
-    | 'NETWORK_ERROR'
-    | 'RATE_LIMITED'
-    | 'SERVER_ERROR'
-    | 'UNKNOWN_ERROR';
+    | "AUTH_REQUIRED"
+    | "AUTH_EXPIRED"
+    | "FORBIDDEN"
+    | "NOT_FOUND"
+    | "VALIDATION_ERROR"
+    | "CONFLICT"
+    | "NETWORK_ERROR"
+    | "RATE_LIMITED"
+    | "SERVER_ERROR"
+    | "UNKNOWN_ERROR";
   message: string;
   fieldErrors?: Record<string, string>;
   retryable: boolean;
@@ -123,6 +121,7 @@ type AppError = {
 - 認証済みユーザーであること。
 - 通常一覧では `archived_at IS NULL` を基本とする。
 - 新規試行選択用の一覧では、アーカイブ済み研究ラインを返さない。
+- Data Accessの既定一覧関数は、`archived_at IS NULL` を付けたうえで `updated_at DESC, created_at DESC` の順で返す。
 
 成功:
 
@@ -144,9 +143,10 @@ type AppError = {
 検証:
 
 - `title` は必須。
-- `title` は前後空白をtrimした値を保存する。trim後に空になる値は許可しない。
+- `title` は前後空白をtrimした値を保存する。Data Accessは保存前に `trim()` を適用し、その結果に対して長さ検証を行う。これはDBの `title = btrim(title)` 制約と一致させるための normalize であり、DBより広い意味付けは追加しない。
 - 同一ユーザー内の未アーカイブ研究ラインで、trim後タイトルが完全一致するものは許可しない。
 - 大文字小文字、全角半角、Unicode正規化はv1では同一視しない。
+- `description` は任意で、Data Accessでは空文字を強制的に `null` へ変換しない。文字数上限 500 だけをクライアント側でも確認し、trimや正規化を追加しない。
 
 失敗:
 
@@ -162,11 +162,30 @@ type AppError = {
 - 物理削除は行わない。
 - 既存試行の `research_line_id` は変更しない。
 - アーカイブ済み研究ラインは新規試行選択用一覧に返さない。
+- アーカイブ後は、同一ユーザーが同じtrim後タイトルで新しい研究ラインを再作成できる。Data Accessはアーカイブ済み行を通常一覧から除外するが、archive後に同名再利用を独自に拒否しない。
 
 失敗:
 
 - 対象なし: `NOT_FOUND`
 - 権限なし: `FORBIDDEN`
+
+### 7.4 詳細取得
+
+条件:
+
+- 認証済みユーザーであること。
+- 本人の研究ラインだけを返す。
+- `archived_at` が設定済みの研究ラインでも、既存試行や履歴から参照できるよう通常の詳細取得では返してよい。
+
+失敗:
+
+- 対象なしまたは表示不可: `NOT_FOUND`
+- 権限なし: `FORBIDDEN`
+
+### 7.5 削除
+
+- `research_lines` の physical delete API はData Accessに作らない。
+- v1の削除相当操作は `archived_at` 更新だけに限定する。
 
 ## 8. Trials契約
 
@@ -390,16 +409,16 @@ soft_delete_trial(trial_id uuid)
 
 エラー表示では内部情報を出さない。
 
-| エラー | 表示例 |
-|---|---|
-| `AUTH_REQUIRED` | ログインが必要です。メール認証を行ってください。 |
-| `AUTH_EXPIRED` | セッションが切れました。もう一度ログインしてください。 |
-| `FORBIDDEN` | 対象のデータを表示または変更できません。 |
-| `NOT_FOUND` | 対象のデータが見つからないか、表示できません。 |
-| `VALIDATION_ERROR` | 入力内容を確認してください。 |
-| `CONFLICT` | データの状態が変わっています。再読み込みして確認してください。 |
-| `NETWORK_ERROR` | 通信に失敗しました。接続を確認して再試行してください。 |
-| `SERVER_ERROR` | 保存に失敗しました。入力内容は保持されています。 |
+| エラー             | 表示例                                                         |
+| ------------------ | -------------------------------------------------------------- |
+| `AUTH_REQUIRED`    | ログインが必要です。メール認証を行ってください。               |
+| `AUTH_EXPIRED`     | セッションが切れました。もう一度ログインしてください。         |
+| `FORBIDDEN`        | 対象のデータを表示または変更できません。                       |
+| `NOT_FOUND`        | 対象のデータが見つからないか、表示できません。                 |
+| `VALIDATION_ERROR` | 入力内容を確認してください。                                   |
+| `CONFLICT`         | データの状態が変わっています。再読み込みして確認してください。 |
+| `NETWORK_ERROR`    | 通信に失敗しました。接続を確認して再試行してください。         |
+| `SERVER_ERROR`     | 保存に失敗しました。入力内容は保持されています。               |
 
 ## 15. ログ方針
 
