@@ -45,11 +45,11 @@
 
 ## GitHub反映状況
 
-- GitHubに反映済み: push前。完了前に `main` へ push し、最終報告で反映 branch と最終 commit hash を示す
+- GitHubに反映済み: あり。UI実装 commit `81560472795b7781495700130be25c8a1554d526` を `main` へ push し、GitHub上の `refs/heads/main` でも同一hashを確認した
 - 反映ブランチ: `main`
-- 反映確認に使ったコミット識別情報: push後に最終報告で示す
+- 反映確認に使ったコミット識別情報: `81560472795b7781495700130be25c8a1554d526`
 - CI確認の要否判断: 必須。大きなコード変更であり、かつ本worklog追加により `main` push の docs workflow 対象になるため
-- CI結果 / 未確認理由: push後に確認する。コード側のCI workflowは現状存在しないため、ローカル軽量確認を代替確認にする
+- CI結果 / 未確認理由: GitHub Actions `Docs` workflow run `24680277831` が `completed/success`。コード側のCI workflowは現状存在しないため、コード変更はローカル軽量確認を代替確認にした
 
 ## 変更ファイル一覧
 
@@ -87,6 +87,9 @@
 | `rg --files -g '!docs/**' -g '!README.md' \| rg '\\[[^/]+\\]'` | 静的export禁止の動的route混入確認 | 0件 |
 | `rg -n -g '!docs/**' -g '!README.md' -g '!package-lock.json' -g '!supabase/verification/sql/m2-db-slice-verification-template.sql' 'public_slug\|share_token\|visibility\|follow\|comment\|reaction\|photo\|storage\|AI提案\|compare\|graph' .` | v1対象外導線の混入確認 | 0件 |
 | `npm run check:docs` | worklog追加後の運用文書確認 | 成功。Operational docs check passed |
+| `git push origin main` | GitHub反映 | 成功。`4ec6ee4..8156047 main -> main` |
+| `git ls-remote origin refs/heads/main` | GitHub上の反映hash確認 | 成功。`81560472795b7781495700130be25c8a1554d526` |
+| `gh run list --repo iwachacha/chai-lab --branch main --limit 5` | push後CI確認 | 成功。`Docs` workflow run `24680277831` が `completed/success` |
 
 ## 完了判断
 
