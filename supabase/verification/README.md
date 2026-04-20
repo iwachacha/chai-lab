@@ -16,10 +16,26 @@
 ## M2-02で固定するローカル検証方法
 
 - 非本番検証の既定は、local PostgreSQL互換 harness上で SQL を実行する方法にする。
+- `research_lines` sliceで実際に使う非本番検証先は、`npx -y -p @electric-sql/pglite node supabase/verification/scripts/run-pglite-verification.mjs ...` で起動する one-shot local `@electric-sql/pglite` runtime に固定する。
 - actor切替の正本は `sql/local-db-auth-harness.sql` とし、A/B/anon は SQL セッション内で切り替える。
 - Actor A / Actor B: `RESET ROLE; SET ROLE authenticated; SELECT set_config('request.jwt.claim.sub', '<actor-uuid>', false);`
 - anon: `RESET ROLE; SET ROLE anon; SELECT set_config('request.jwt.claim.sub', '', false);`
 - 実際に使った runtime は、sliceごとの `runs/` 補助証跡とworklogへ残す。local PostgreSQL、PGlite など runtime差は許容するが、actor切替SQLは変えない。
+
+### M2-02 `research_lines` 再実行コマンド
+
+```powershell
+npx -y -p @electric-sql/pglite node `
+  supabase/verification/scripts/run-pglite-verification.mjs `
+  --query "select sort_order, check_key, passed, expected, observed, sqlstate from pg_temp.research_lines_verification_results order by sort_order" `
+  supabase/verification/sql/local-db-auth-harness.sql `
+  supabase/migrations/20260420103000_create_research_lines_table.sql `
+  supabase/migrations/20260420104000_add_research_lines_access_policies.sql `
+  supabase/verification/runs/2026-04-21-m2-02-research-lines-verification.sql
+```
+
+- 上のコマンドが今回の `research_lines` slice で固定した再実行手順です。
+- 出力結果は `supabase/verification/runs/2026-04-21-m2-02-research-lines-verification.md` と worklog から参照できるように残します。
 
 ## このディレクトリで固定すること
 
