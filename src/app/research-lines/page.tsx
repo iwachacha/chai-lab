@@ -1,5 +1,5 @@
-import { ProtectedFoundationPage } from "@/components/m1/protected-foundation-page";
+import { ResearchLinesListClient } from "@/components/research-lines/research-lines-list-client";
 
 export default function ResearchLinesPage() {
-  return <ProtectedFoundationPage title="研究ライン" />;
+  return <ResearchLinesListClient />;
 }

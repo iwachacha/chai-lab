@@ -18,9 +18,27 @@ export function PageShell({
     <div className="min-h-screen bg-bg text-text">
       <header className="border-b border-border bg-surface">
         <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-4 px-4 py-4">
-          <Link className="text-base font-bold text-primary" href="/home/">
-            chai-lab
-          </Link>
+          <div className="flex items-center gap-6">
+            <Link className="text-base font-bold text-primary" href="/home/">
+              chai-lab
+            </Link>
+            {showNavigation ? (
+              <nav
+                aria-label="主要ナビゲーション"
+                className="hidden items-center gap-1 md:flex"
+              >
+                {navigationItems.map((item) => (
+                  <Link
+                    className="rounded-md px-3 py-2 text-sm font-semibold text-text hover:bg-bg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                    href={item.href}
+                    key={item.href}
+                  >
+                    {item.label}
+                  </Link>
+                ))}
+              </nav>
+            ) : null}
+          </div>
           {actions ? (
             <div className="flex items-center gap-2">{actions}</div>
           ) : null}
