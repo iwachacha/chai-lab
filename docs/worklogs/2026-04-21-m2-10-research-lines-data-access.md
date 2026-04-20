@@ -38,9 +38,9 @@
 
 ## GitHub反映状況
 
-- GitHubに反映済み: 未実施。commit / push 後に最終反映状況を確定する
+- GitHubに反映済み: あり。Data Access 実装 commit を branch へ push 済み
 - 反映ブランチ: `codex/m2-02-research-lines-verification-closure`
-- 反映確認に使ったコミット識別情報: commit / push 後に記入
+- 反映確認に使ったコミット識別情報: `00baebdc9f3e15822c13aa4a33b2a12054d5567a`
 - CI確認の要否判断: 必須。大きなコード変更かつ認可境界の Data Access 追加だから
 - CI結果 / 未確認理由: repo の workflow は `.github/workflows/docs.yml` のみで、push 対象は `main` の docs 系 path に限定されている。現在の branch push では code CI を確認できないため、local の `lint` / `typecheck` / `test` / `build` / `check:docs` を代替確認として採用する
 
@@ -62,17 +62,18 @@
 
 ## 実行コマンドと結果
 
-| コマンド                                                                                                                                                                                         | 用途                                                         | 結果                                               |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------ | -------------------------------------------------- |
-| `npm run test -- src/lib/research-lines/data-access.test.ts`                                                                                                                                     | `research_lines` Data Access の contract test を先に局所確認 | 成功。9 tests passed                               |
-| `npm run typecheck`                                                                                                                                                                              | 追加した Data Access / test の型整合確認                     | 成功                                               |
-| `npm run lint`                                                                                                                                                                                   | ESLint 整合確認                                              | 成功                                               |
-| `npm run check:docs`                                                                                                                                                                             | 契約文書 / worklog 整合確認                                  | 成功                                               |
-| `npm run test`                                                                                                                                                                                   | 既存 unit test を含む全体回帰確認                            | 成功。3 files / 18 tests passed                    |
-| `npm run build`                                                                                                                                                                                  | 静的 build と route 生成確認                                 | 成功。`/research-lines` と既存固定ルートを静的生成 |
-| `rg -n 'from\\([''\\\"]trials[''\\\"]\\)\\.(insert\|update\|upsert\|delete)\|from\\([''\\\"]trial_ingredients[''\\\"]\\)\\.(insert\|update\|upsert\|delete)' src tests supabase scripts`         | `trials` / `trial_ingredients` direct write 混入確認         | 0件                                                |
-| `rg -n 'SUPABASE_SERVICE_ROLE_KEY\|service_role\|DB_CONNECTION\|DATABASE_URL\|OPENAI_API_KEY\|R2_\|STORAGE_' src tests supabase scripts .env.example`                                            | secret / `service_role` 混入確認                             | 0件                                                |
-| `rg -n -g '!supabase/verification/sql/m2-db-slice-verification-template.sql' 'public_slug\|share_token\|visibility\|follow\|comment\|reaction\|photo\|AI提案\|graph' src tests supabase scripts` | v1 scope 逸脱語の確認                                        | 0件                                                |
+| コマンド                                                                                                                                                                                         | 用途                                                         | 結果                                                    |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------ | ------------------------------------------------------- |
+| `npm run test -- src/lib/research-lines/data-access.test.ts`                                                                                                                                     | `research_lines` Data Access の contract test を先に局所確認 | 成功。9 tests passed                                    |
+| `npm run typecheck`                                                                                                                                                                              | 追加した Data Access / test の型整合確認                     | 成功                                                    |
+| `npm run lint`                                                                                                                                                                                   | ESLint 整合確認                                              | 成功                                                    |
+| `npm run check:docs`                                                                                                                                                                             | 契約文書 / worklog 整合確認                                  | 成功                                                    |
+| `npm run test`                                                                                                                                                                                   | 既存 unit test を含む全体回帰確認                            | 成功。3 files / 18 tests passed                         |
+| `npm run build`                                                                                                                                                                                  | 静的 build と route 生成確認                                 | 成功。`/research-lines` と既存固定ルートを静的生成      |
+| `rg -n 'from\\([''\\\"]trials[''\\\"]\\)\\.(insert\|update\|upsert\|delete)\|from\\([''\\\"]trial_ingredients[''\\\"]\\)\\.(insert\|update\|upsert\|delete)' src tests supabase scripts`         | `trials` / `trial_ingredients` direct write 混入確認         | 0件                                                     |
+| `rg -n 'SUPABASE_SERVICE_ROLE_KEY\|service_role\|DB_CONNECTION\|DATABASE_URL\|OPENAI_API_KEY\|R2_\|STORAGE_' src tests supabase scripts .env.example`                                            | secret / `service_role` 混入確認                             | 0件                                                     |
+| `rg -n -g '!supabase/verification/sql/m2-db-slice-verification-template.sql' 'public_slug\|share_token\|visibility\|follow\|comment\|reaction\|photo\|AI提案\|graph' src tests supabase scripts` | v1 scope 逸脱語の確認                                        | 0件                                                     |
+| `git push origin codex/m2-02-research-lines-verification-closure`                                                                                                                                | GitHub へ branch 反映                                        | 成功。`00baebdc9f3e15822c13aa4a33b2a12054d5567a` を確認 |
 
 ## 完了判断
 
