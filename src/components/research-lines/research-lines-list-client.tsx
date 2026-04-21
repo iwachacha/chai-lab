@@ -15,6 +15,11 @@ import {
   listActiveResearchLines,
   type ResearchLine,
 } from "@/lib/research-lines/data-access";
+import {
+  formatJstCalendarDate,
+  listTrialStatsByResearchLineIds,
+  type TrialStatsByResearchLine,
+} from "@/lib/trials/data-access";
 
 type ListState =
   | { status: "loading" }
@@ -96,6 +101,7 @@ export function ResearchLinesListClient() {
     status: "loading",
   });
   const [reloadKey, setReloadKey] = useState(0);
+  const [trialStats, setTrialStats] = useState<TrialStatsByResearchLine>({});
 
   useEffect(() => {
     let active = true;
@@ -111,6 +117,16 @@ export function ResearchLinesListClient() {
       }
 
       setListState({ status: "ready", lines: result.data });
+
+      void listTrialStatsByResearchLineIds(
+        result.data.map((line) => line.id),
+      ).then((statsResult) => {
+        if (!active || !statsResult.ok) {
+          return;
+        }
+
+        setTrialStats(statsResult.data);
+      });
     });
 
     return () => {
@@ -329,6 +345,7 @@ export function ResearchLinesListClient() {
                   archiveState.status === "saving" &&
                   archiveState.id === line.id;
                 const isConfirming = confirmArchiveId === line.id;
+                const stats = trialStats[line.id];
 
                 return (
                   <article
@@ -349,6 +366,20 @@ export function ResearchLinesListClient() {
                           ? line.description
                           : "説明はまだありません。"}
                       </p>
+                      <dl className="grid gap-1 text-sm text-muted sm:grid-cols-2">
+                        <div className="flex flex-col gap-1 sm:flex-row sm:gap-2">
+                          <dt className="font-semibold text-text">試行</dt>
+                          <dd>{stats?.trialCount ?? 0}件</dd>
+                        </div>
+                        <div className="flex flex-col gap-1 sm:flex-row sm:gap-2">
+                          <dt className="font-semibold text-text">最終試行</dt>
+                          <dd>
+                            {stats?.lastBrewedAt
+                              ? formatJstCalendarDate(stats.lastBrewedAt)
+                              : "未記録"}
+                          </dd>
+                        </div>
+                      </dl>
                     </div>
 
                     {archiveError ? (

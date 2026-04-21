@@ -16,11 +16,21 @@ import {
   updateResearchLine,
   type ResearchLine,
 } from "@/lib/research-lines/data-access";
+import {
+  formatJstCalendarDate,
+  listTrialsByResearchLine,
+  type TrialSummary,
+} from "@/lib/trials/data-access";
 
 type DetailState =
   | { status: "loading" }
   | { status: "ready"; line: ResearchLine }
   | { status: "error"; error: AppError };
+
+type TrialsState =
+  | { status: "loading" }
+  | { status: "ready"; researchLineId: string; trials: TrialSummary[] }
+  | { status: "error"; error: AppError; researchLineId: string };
 
 type SaveState =
   | { status: "idle" }
@@ -81,6 +91,9 @@ export function ResearchLineDetailClient() {
   const [detailState, setDetailState] = useState<DetailState>({
     status: "loading",
   });
+  const [trialsState, setTrialsState] = useState<TrialsState>({
+    status: "loading",
+  });
   const [draft, setDraft] = useState<ResearchLineDraft>({
     description: "",
     title: "",
@@ -117,6 +130,27 @@ export function ResearchLineDetailClient() {
       setArchiveConfirming(false);
       setArchiveState({ status: "idle" });
       setSaveState({ status: "idle" });
+    });
+
+    void listTrialsByResearchLine(id).then((result) => {
+      if (!active) {
+        return;
+      }
+
+      if (!result.ok) {
+        setTrialsState({
+          status: "error",
+          error: result.error,
+          researchLineId: id,
+        });
+        return;
+      }
+
+      setTrialsState({
+        status: "ready",
+        researchLineId: id,
+        trials: result.data,
+      });
     });
 
     return () => {
@@ -196,6 +230,12 @@ export function ResearchLineDetailClient() {
     : detailState.status === "ready" && detailState.line.id !== id
       ? { status: "loading" as const }
       : detailState;
+  const visibleTrialsState =
+    visibleDetailState.status === "ready" &&
+    trialsState.status !== "loading" &&
+    trialsState.researchLineId !== visibleDetailState.line.id
+      ? { status: "loading" as const }
+      : trialsState;
 
   return (
     <AuthGate>
@@ -263,6 +303,119 @@ export function ResearchLineDetailClient() {
                   <dd>{formatDateTime(visibleDetailState.line.updatedAt)}</dd>
                 </div>
               </dl>
+            </section>
+
+            <section className="grid gap-4 rounded-md border border-border bg-surface p-4">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div className="grid gap-1">
+                  <h2 className="text-lg font-bold text-text">試行</h2>
+                  <p className="text-sm leading-6 text-muted">
+                    この研究ラインで記録した試行を最新順に表示します。
+                  </p>
+                </div>
+                {visibleDetailState.line.archivedAt ? null : (
+                  <LinkButton
+                    className="w-full sm:w-auto"
+                    href={`/trials/new/?researchLineId=${encodeURIComponent(
+                      visibleDetailState.line.id,
+                    )}`}
+                  >
+                    新しい試行
+                  </LinkButton>
+                )}
+              </div>
+
+              {visibleTrialsState.status === "loading" ? (
+                <StatusMessage role="status">
+                  試行を読み込んでいます。
+                </StatusMessage>
+              ) : null}
+
+              {visibleTrialsState.status === "error" ? (
+                <div className="grid gap-3">
+                  <StatusMessage kind="error" role="alert">
+                    {visibleTrialsState.error.message}
+                  </StatusMessage>
+                  <Button
+                    className="w-full sm:w-auto"
+                    onClick={() => {
+                      setDetailState({ status: "loading" });
+                      setTrialsState({ status: "loading" });
+                      setReloadKey((key) => key + 1);
+                    }}
+                    variant="secondary"
+                  >
+                    もう一度読み込む
+                  </Button>
+                </div>
+              ) : null}
+
+              {visibleTrialsState.status === "ready" &&
+              visibleTrialsState.trials.length === 0 ? (
+                <div className="grid gap-3 rounded-md border border-border p-3">
+                  <h3 className="text-base font-bold text-text">
+                    まだ試行がありません
+                  </h3>
+                  <p className="text-sm leading-6 text-muted">
+                    この研究ラインで最初の試行を記録します。
+                  </p>
+                  {visibleDetailState.line.archivedAt ? null : (
+                    <LinkButton
+                      className="w-full sm:w-auto"
+                      href={`/trials/new/?researchLineId=${encodeURIComponent(
+                        visibleDetailState.line.id,
+                      )}`}
+                    >
+                      最初の試行を記録
+                    </LinkButton>
+                  )}
+                </div>
+              ) : null}
+
+              {visibleTrialsState.status === "ready" &&
+              visibleTrialsState.trials.length > 0 ? (
+                <div className="grid gap-3">
+                  {visibleTrialsState.trials.map((trial) => (
+                    <article
+                      className="grid gap-3 rounded-md border border-border p-3"
+                      key={trial.id}
+                    >
+                      <div className="grid gap-1">
+                        <h3 className="text-base font-bold leading-tight text-text">
+                          {trial.title}
+                        </h3>
+                        <p className="text-sm text-muted">
+                          {formatJstCalendarDate(trial.brewedAt)} / 評価{" "}
+                          {trial.rating}
+                        </p>
+                      </div>
+                      <p className="text-sm leading-6 text-muted">
+                        {trial.note}
+                      </p>
+                      <div className="flex flex-col gap-2 sm:flex-row">
+                        <LinkButton
+                          className="w-full sm:w-auto"
+                          href={`/trials/detail/?id=${encodeURIComponent(
+                            trial.id,
+                          )}`}
+                          variant="secondary"
+                        >
+                          詳細
+                        </LinkButton>
+                        <LinkButton
+                          className="w-full sm:w-auto"
+                          href={`/trials/edit/?id=${encodeURIComponent(
+                            trial.id,
+                          )}`}
+                          variant="secondary"
+                        >
+                          編集
+                        </LinkButton>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              ) : null}
             </section>
 
             {visibleDetailState.line.archivedAt ? (

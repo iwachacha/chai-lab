@@ -10,6 +10,7 @@ import {
   listActiveResearchLines,
   type ResearchLine,
 } from "@/lib/research-lines/data-access";
+import { listTrialStatsByResearchLineIds } from "@/lib/trials/data-access";
 
 import { ResearchLinesListClient } from "./research-lines-list-client";
 
@@ -21,6 +22,11 @@ vi.mock("@/lib/research-lines/data-access", () => ({
   archiveResearchLine: vi.fn(),
   createResearchLine: vi.fn(),
   listActiveResearchLines: vi.fn(),
+}));
+
+vi.mock("@/lib/trials/data-access", () => ({
+  formatJstCalendarDate: (value: string) => `JST:${value}`,
+  listTrialStatsByResearchLineIds: vi.fn(),
 }));
 
 const activeLine: ResearchLine = {
@@ -42,6 +48,15 @@ describe("ResearchLinesListClient", () => {
     mockActiveList();
     vi.mocked(createResearchLine).mockResolvedValue(ok(activeLine));
     vi.mocked(archiveResearchLine).mockResolvedValue(ok(activeLine));
+    vi.mocked(listTrialStatsByResearchLineIds).mockResolvedValue(
+      ok({
+        [activeLine.id]: {
+          lastBrewedAt: "2026-04-21T15:00:00.000Z",
+          lastBrewedAtDate: "2026-04-22",
+          trialCount: 2,
+        },
+      }),
+    );
   });
 
   it("renders the active list with edit and archive paths", async () => {
@@ -56,6 +71,10 @@ describe("ResearchLinesListClient", () => {
     expect(within(card).getByText("朝用")).toBeInTheDocument();
     expect(
       within(card).getByText("朝の濃さを少しずつ見る"),
+    ).toBeInTheDocument();
+    expect(within(card).getByText("2件")).toBeInTheDocument();
+    expect(
+      within(card).getByText("JST:2026-04-21T15:00:00.000Z"),
     ).toBeInTheDocument();
     expect(
       within(card).getByRole("link", { name: "詳細と編集" }),

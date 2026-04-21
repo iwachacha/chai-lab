@@ -199,6 +199,7 @@ type AppError = {
 - 研究ライン、スター有無、日付範囲で絞り込める。
 - 初回取得は50件までとし、追加読み込みも50件単位とする。
 - 並び順は `brewed_at DESC, created_at DESC` を基本とする。
+- `brewed_at` はv1では `Asia/Tokyo` のカレンダー日として扱う。Data Accessはdate-only入力をJST 00:00のISO timestampへ変換して保存し、表示用にはJST日付へ戻す。日付範囲検索を実装する場合は `[開始日JST 00:00, 翌日JST 00:00)` で境界を作る。
 
 成功:
 
@@ -275,6 +276,16 @@ type AppError = {
 ```sql
 save_trial_with_ingredients(input jsonb)
 ```
+
+RPC内部エラー識別子は、PostgreSQLのmessage文字列ではなく `hint` の安定値として扱う。Data Accessは次の表で `AppError` へ明示的に変換し、UIへ識別子、SQL、生エラーを表示しない。
+
+| RPC hint                   | AppError分類       | retryable | UI方針                                   |
+| -------------------------- | ------------------ | --------: | ---------------------------------------- |
+| `CHAI_TRIAL_AUTH_REQUIRED` | `AUTH_REQUIRED`    |      true | ログインを促す                           |
+| `CHAI_TRIAL_FORBIDDEN`     | `FORBIDDEN`        |     false | 表示または変更できない旨を表示           |
+| `CHAI_TRIAL_NOT_FOUND`     | `NOT_FOUND`        |     false | 対象が見つからないか表示できない旨を表示 |
+| `CHAI_TRIAL_VALIDATION`    | `VALIDATION_ERROR` |     false | 入力内容の確認を促す                     |
+| `CHAI_TRIAL_CONFLICT`      | `CONFLICT`         |     false | 再読み込みまたは入力修正を促す           |
 
 成功:
 

@@ -1,5 +1,5 @@
-import { ProtectedFoundationPage } from "@/components/m1/protected-foundation-page";
+import { TrialHistoryClient } from "@/components/trials/trial-history-client";
 
 export default function TrialHistoryPage() {
-  return <ProtectedFoundationPage title="試行履歴" />;
+  return <TrialHistoryClient />;
 }
