@@ -269,6 +269,18 @@ type AppError = {
 - 権限なし: `FORBIDDEN`
 - 既に論理削除済み: `CONFLICT`
 
+### 8.5 Trial最小縦切りの検証済みData Access境界
+
+2026-04-22の非本番PGlite検証では、Trial最小縦切りについて次の境界を実証済みとする。補助証跡は `supabase/verification/runs/2026-04-22-trials-minimum-slice-verification.md` を参照する。
+
+- Data Accessが使う保存経路は `save_trial_with_ingredients(input jsonb)` であり、ownerの新規保存と編集が成功する。
+- Data Accessが使う論理削除経路は `soft_delete_trial(trial_id uuid)` であり、ownerの未削除Trialだけを論理削除できる。
+- `trials` / `trial_ingredients` の直接 insert / update / delete / upsert は、Data Access層から提供しないだけでなく、DB grant上も `authenticated` で `42501` 拒否される。
+- 他ユーザー相当のselectは0件になり、cross-ownerの保存、編集、論理削除RPCは `CHAI_TRIAL_NOT_FOUND` hintで拒否される。
+- 論理削除済みTrialはRLSにより通常selectから見えないため、Data Accessの通常一覧、詳細、集計、スター状態取得、複製元候補では返さない。
+
+実Supabase projectへ接続する作業では、同じverification SQLを再実行し、PGlite harnessとの差分がないことを確認する。
+
 ## 9. `save_trial_with_ingredients` RPC契約
 
 関数:

@@ -285,6 +285,22 @@ v1では全データを非公開とし、認証ユーザー本人のみが自分
 - `save_trial_with_ingredients`、`clone_trial`、`soft_delete_trial` RPC は `security definer` を使用する場合でも、内部で必ず `auth.uid()` と対象レコードの所有者を照合する。
 - RLSテストでは、ユーザーAがユーザーBの研究ライン、試行、材料行、スターを読めないことを確認する。
 
+### 3.7 Trial最小縦切りの非本番検証状況
+
+2026-04-22時点で、`trials` / `trial_ingredients`、`save_trial_with_ingredients`、`soft_delete_trial` の最小縦切りは、one-shot local PGlite 非本番runtimeで `supabase/verification/runs/2026-04-22-trials-minimum-slice-verification.sql` を実行し、RLS / grant / RPC境界の全probeが成功している。
+
+確認済みの境界は次とする。
+
+- `authenticated` は `trials` / `trial_ingredients` をselectのみ直接実行できる。
+- `anon` / `public` には `trials` / `trial_ingredients` のtable grantを付与しない。
+- `save_trial_with_ingredients` と `soft_delete_trial` は `authenticated` のみ実行でき、`PUBLIC` 実行権限は取り消す。
+- ownerはRPC経由で試行の新規保存、編集、論理削除ができる。
+- `trials` / `trial_ingredients` への直接 insert / update / delete / upsert は `42501` で拒否される。
+- 他ユーザー相当は対象Trialと材料行をselectできず、cross-ownerの保存、編集、論理削除RPCは `CHAI_TRIAL_NOT_FOUND` で拒否される。
+- 論理削除後のTrialは通常selectから見えない。
+
+残る差分リスクは、実Supabase project固有のruntime差である。実Supabase projectへ接続する作業では、同じverification SQLを再実行してから本番deployや後続RPC依存機能を完了扱いにする。
+
 ## 4. 画面設計
 
 v1の画面は、研究ログを素早く保存し、前回の試行を複製して少し変える体験に集中する。写真、カレンダー、比較画面、系譜グラフ、設定の高度なカスタマイズはv1では扱わない。
