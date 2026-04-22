@@ -34,11 +34,11 @@
 
 ## GitHub反映状況
 
-- GitHubに反映済み: 未反映
-- 反映ブランチ: 未反映
-- 反映確認に使ったコミット識別情報: 未反映
+- GitHubに反映済み: はい
+- 反映ブランチ: `main`
+- 反映確認に使ったコミット識別情報: `f550af4c8249cd993898365cd04f308857fd3061` (`Implement clone trial vertical slice`)
 - CI確認の要否判断: 大きなコード変更かつ依頼者がActions確認を求めているため、push後に確認する
-- CI結果 / 未確認理由: push前のため未確認
+- CI結果 / 未確認理由: GitHub connectorで `f550af4c8249cd993898365cd04f308857fd3061` の workflow runs と combined statuses を確認し、どちらも空。確認可能なActionsは見つからなかったため、ローカル検証結果を正式な完了根拠とする
 
 ## 変更ファイル一覧
 
@@ -77,6 +77,8 @@
 | `rg --files -g "!docs/**" -g "!README.md" \| rg "\[[^/]+\]"` | 動的route混入確認 | pass。該当なし |
 | `rg -n -g "!docs/**" -g "!README.md" "public_slug\|share_token\|visibility\|follow\|comment\|reaction\|photo\|storage\|AI提案\|compare\|graph" .` | v1対象外キーワード検索 | false positiveのみ。`package-lock.json` の依存名と verification template comment に限定 |
 | `git diff --check` | whitespace確認 | pass。CRLF warningのみ |
+| `git push origin main` | GitHub反映 | pass。`492fbfa..f550af4 main -> main` |
+| GitHub connector `_fetch_commit_workflow_runs` / `_get_commit_combined_status` | Actions / status確認 | workflow runs `[]`、statuses `[]` |
 
 ## 完了判断
 
