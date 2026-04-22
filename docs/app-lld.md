@@ -214,13 +214,14 @@ type SaveTrialInput = {
 
 `clone_trial` は指定された試行を複製し、新しい試行IDを返す。
 
-- 元試行が認証ユーザーのものでない場合は失敗する。
-- 元試行が論理削除済みの場合は失敗する。
-- 元試行の研究ラインがアーカイブ済みの場合は失敗する。
+- 元試行は認証ユーザー本人の未削除試行でなければならない。
+- 元試行が存在しない、他ユーザーの試行である、論理削除済みである、または元試行の研究ラインがアーカイブ済みである場合は、存在を漏らさず同じ `CHAI_TRIAL_NOT_FOUND` として失敗する。
 - `trial_ingredients` をコピーする。
 - 新しい試行の `parent_trial_id` には元試行IDを設定する。
 - `trial_stars` はコピーしない。
 - `created_at`、`updated_at` は新規作成時刻とする。
+- 複製成功後は編集画面へ遷移する。v1ではDB作成済みの新しい試行として扱い、不要な複製は通常の `soft_delete_trial` で取り消す。
+- `rating`、`note`、`next_idea` は現行schema上の必須入力であり、次の試行の下敷きとしてコピーする。コピー後に編集画面で調整する前提で、`id`、`created_at`、`updated_at`、`brewed_at`、`deleted_at` は新規試行として扱う。
 
 コピー対象は以下とする。
 
@@ -300,6 +301,22 @@ v1では全データを非公開とし、認証ユーザー本人のみが自分
 - 論理削除後のTrialは通常selectから見えない。
 
 残る差分リスクは、実Supabase project固有のruntime差である。実Supabase projectへ接続する作業では、同じverification SQLを再実行してから本番deployや後続RPC依存機能を完了扱いにする。
+
+### 3.8 `clone_trial` の非本番検証状況
+
+2026-04-22時点で、M4の最初の危険変更として `clone_trial` の最小縦切りを追加し、one-shot local PGlite 非本番runtimeで `supabase/verification/runs/2026-04-22-clone-trial-verification.sql` を実行している。
+
+確認済みの境界は次とする。
+
+- `clone_trial` は `authenticated` のみ実行でき、`PUBLIC` 実行権限は取り消す。
+- `authenticated` は `trials` / `trial_ingredients` をselectのみ直接実行でき、insert / update / delete / upsertは引き続き拒否される。
+- ownerは本人の未削除Trialをcloneでき、新しいTrialの `parent_trial_id` に元Trial IDが入る。
+- clone結果は新しいactive Trialとして通常selectと詳細材料取得で見える。
+- 材料行は元Trialから必要数コピーされる。
+- cross-owner、存在しないID、論理削除済みTrial、アーカイブ済み研究ライン配下のTrialはいずれも `CHAI_TRIAL_NOT_FOUND` で拒否される。
+- 論理削除済みの元Trialは通常selectから見えず、clone済みTrialはactiveのまま残る。
+
+この検証は非本番PGlite harnessの結果であり、実Supabase projectへ接続する作業では同じverification SQLを再実行してから本番deployや後続機能を完了扱いにする。
 
 ## 4. 画面設計
 

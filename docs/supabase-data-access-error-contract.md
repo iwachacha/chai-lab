@@ -279,6 +279,8 @@ type AppError = {
 - 他ユーザー相当のselectは0件になり、cross-ownerの保存、編集、論理削除RPCは `CHAI_TRIAL_NOT_FOUND` hintで拒否される。
 - 論理削除済みTrialはRLSにより通常selectから見えないため、Data Accessの通常一覧、詳細、集計、スター状態取得、複製元候補では返さない。
 
+2026-04-22の `clone_trial` 非本番PGlite検証では、ownerのactive Trial複製、材料行コピー、`parent_trial_id` 保存、direct table write拒否、select-only grant、function grant、cross-owner / missing / archived source の `CHAI_TRIAL_NOT_FOUND` 統一を実証済みとする。補助証跡は `supabase/verification/runs/2026-04-22-clone-trial-verification.md` を参照する。
+
 実Supabase projectへ接続する作業では、同じverification SQLを再実行し、PGlite harnessとの差分がないことを確認する。
 
 ## 9. `save_trial_with_ingredients` RPC契約
@@ -340,13 +342,11 @@ clone_trial(source_trial_id uuid)
 失敗:
 
 - 未認証: `AUTH_REQUIRED`
-- 複製元が存在しない、または表示不可: `NOT_FOUND`
-- 他ユーザーの試行: `FORBIDDEN`
-- 元試行が論理削除済み: `CONFLICT`
-- 元試行の研究ラインがアーカイブ済み: `CONFLICT`
+- 複製元が存在しない、他ユーザーの試行である、論理削除済みである、または元試行の研究ラインがアーカイブ済み: `NOT_FOUND`
+- `source_trial_id` の形式不正: `VALIDATION_ERROR`
 - DB処理失敗: `SERVER_ERROR`
 
-UIでは、RPC失敗時も入力済み内容や現在画面を保持し、再試行または戻る導線を表示する。
+cross-owner / archived / missing は存在漏洩を避けるため、RPC hintを `CHAI_TRIAL_NOT_FOUND` に統一する。Data Accessはこれを `NOT_FOUND` に正規化し、UIではRPC失敗時も現在画面を保持して再試行または戻る導線を表示する。
 
 ## 11. `soft_delete_trial` RPC契約
 

@@ -10,6 +10,7 @@ import { StatusMessage } from "@/components/ui/status-message";
 import { appError, type AppError } from "@/lib/app-result";
 import {
   archiveTrial,
+  cloneTrial,
   formatJstCalendarDate,
   getTrialById,
   ingredientCategoryLabels,
@@ -24,6 +25,11 @@ type DetailState =
 type ArchiveState =
   | { status: "idle" }
   | { status: "confirming" }
+  | { status: "saving" }
+  | { status: "error"; error: AppError };
+
+type CloneState =
+  | { status: "idle" }
   | { status: "saving" }
   | { status: "error"; error: AppError };
 
@@ -53,6 +59,9 @@ export function TrialDetailClient() {
   const [archiveState, setArchiveState] = useState<ArchiveState>({
     status: "idle",
   });
+  const [cloneState, setCloneState] = useState<CloneState>({
+    status: "idle",
+  });
   const [detailState, setDetailState] = useState<DetailState>({
     status: "loading",
   });
@@ -79,6 +88,7 @@ export function TrialDetailClient() {
 
       setDetailState({ status: "ready", trial: result.data });
       setArchiveState({ status: "idle" });
+      setCloneState({ status: "idle" });
     });
 
     return () => {
@@ -101,6 +111,19 @@ export function TrialDetailClient() {
     );
   }
 
+  async function handleClone(trial: TrialDetail) {
+    setCloneState({ status: "saving" });
+
+    const result = await cloneTrial(trial.id);
+
+    if (!result.ok) {
+      setCloneState({ status: "error", error: result.error });
+      return;
+    }
+
+    router.push(`/trials/edit/?id=${encodeURIComponent(result.data.id)}`);
+  }
+
   const visibleDetailState = !id
     ? {
         status: "error" as const,
@@ -117,6 +140,8 @@ export function TrialDetailClient() {
       : detailState;
   const readyTrial =
     visibleDetailState.status === "ready" ? visibleDetailState.trial : null;
+  const isMutating =
+    archiveState.status === "saving" || cloneState.status === "saving";
   const backHref = readyTrial
     ? `/research-lines/detail/?id=${encodeURIComponent(
         readyTrial.researchLineId,
@@ -267,10 +292,25 @@ export function TrialDetailClient() {
 
             <section className="grid gap-3 rounded-md border border-border bg-surface p-4">
               <h2 className="text-lg font-bold text-text">操作</h2>
+              <p className="text-sm leading-6 text-muted">
+                この試行を次の記録の出発点にできます。
+              </p>
               <div className="flex flex-col gap-2 sm:flex-row">
+                <Button
+                  className="w-full sm:w-auto"
+                  disabled={isMutating}
+                  onClick={() =>
+                    readyTrial ? void handleClone(readyTrial) : undefined
+                  }
+                >
+                  {cloneState.status === "saving"
+                    ? "複製中"
+                    : "複製して編集"}
+                </Button>
                 <LinkButton
                   className="w-full sm:w-auto"
                   href={`/trials/edit/?id=${encodeURIComponent(readyTrial.id)}`}
+                  aria-disabled={isMutating}
                 >
                   編集
                 </LinkButton>
@@ -285,7 +325,7 @@ export function TrialDetailClient() {
                 </LinkButton>
                 <Button
                   className="w-full sm:w-auto"
-                  disabled={archiveState.status === "saving"}
+                  disabled={isMutating}
                   onClick={() => setArchiveState({ status: "confirming" })}
                   variant="danger"
                 >
@@ -321,6 +361,12 @@ export function TrialDetailClient() {
 
               {archiveState.status === "saving" ? (
                 <StatusMessage role="status">処理しています。</StatusMessage>
+              ) : null}
+
+              {cloneState.status === "error" ? (
+                <StatusMessage kind="error" role="alert">
+                  {cloneState.error.message}
+                </StatusMessage>
               ) : null}
 
               {archiveState.status === "error" ? (

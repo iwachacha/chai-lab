@@ -814,6 +814,46 @@ export function createTrialsDataAccess(overrides: Partial<TrialsDeps> = {}) {
       }
     },
 
+    async cloneTrial(id: string): Promise<AppResult<{ id: string }>> {
+      const parsed = uuidSchema.safeParse(id);
+
+      if (!parsed.success) {
+        return err(validationErrorFromZod(parsed.error));
+      }
+
+      const context = await requireAuthenticatedContext(deps);
+
+      if (!context.ok) {
+        return err(context.error);
+      }
+
+      try {
+        const { data, error } = await context.data.client.rpc("clone_trial", {
+          source_trial_id: parsed.data,
+        });
+
+        if (error) {
+          return err(mapTrialError(error));
+        }
+
+        if (typeof data !== "string") {
+          return err(
+            appError(
+              "SERVER_ERROR",
+              "試行の処理に失敗しました。入力内容は保持されています。",
+              {
+                retryable: true,
+              },
+            ),
+          );
+        }
+
+        return ok({ id: data });
+      } catch (cause) {
+        return err(unknownAppError(cause));
+      }
+    },
+
     async archiveTrial(id: string): Promise<AppResult<{ id: string }>> {
       const parsed = uuidSchema.safeParse(id);
 
@@ -854,6 +894,7 @@ export const listTrialsByResearchLine =
   defaultTrialsDataAccess.listTrialsByResearchLine;
 export const getTrialById = defaultTrialsDataAccess.getTrialById;
 export const saveTrial = defaultTrialsDataAccess.saveTrial;
+export const cloneTrial = defaultTrialsDataAccess.cloneTrial;
 export const archiveTrial = defaultTrialsDataAccess.archiveTrial;
 export const listTrialStatsByResearchLineIds =
   defaultTrialsDataAccess.listTrialStatsByResearchLineIds;

@@ -199,6 +199,45 @@ describe("trials data access", () => {
     }
   });
 
+  it("clones a trial through clone_trial RPC without direct table writes", async () => {
+    const clonedTrialId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2";
+    const client = createClient({
+      rpcResponse: { data: clonedTrialId, error: null },
+    });
+    const api = createApi({ client });
+
+    const result = await api.cloneTrial(trialId);
+
+    expect(result).toEqual({ ok: true, data: { id: clonedTrialId } });
+    expect(client.rpc).toHaveBeenCalledWith("clone_trial", {
+      source_trial_id: trialId,
+    });
+    expect(client.from).not.toHaveBeenCalled();
+  });
+
+  it("maps clone_trial hidden source failures to not found", async () => {
+    const client = createClient({
+      rpcResponse: {
+        data: null,
+        error: {
+          hint: "CHAI_TRIAL_NOT_FOUND",
+          message: "internal message must not be shown",
+        },
+      },
+    });
+    const api = createApi({ client });
+
+    const result = await api.cloneTrial(trialId);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("NOT_FOUND");
+      expect(result.error.message).toBe(
+        "対象のデータが見つからないか、表示できません。",
+      );
+    }
+  });
+
   it("summarizes trial counts and last brewed date for research line cards", async () => {
     const builder = createQueryBuilder({
       data: [
