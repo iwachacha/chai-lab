@@ -46,11 +46,11 @@
 
 ## GitHub反映状況
 
-- GitHubに反映済み: 今回の検証補完差分は完了報告前に `main` へpushする
+- GitHubに反映済み: あり。今回の検証補完差分は `main` へpush済み
 - 反映ブランチ: `main`
-- 反映確認に使ったコミット識別情報: push後の最終commit hashを完了報告で提示する
+- 反映確認に使ったコミット識別情報: 完了報告時点の `origin/main` commit hashを提示する
 - CI確認の要否判断: 必須。大きなコード変更かつDB/RLS/RPCを含む危険変更のため
-- CI結果 / 未確認理由: push後に確認する。ローカルでは非本番DB検証と軽量確認を先行実施した
+- CI結果 / 未確認理由: GitHub Actions `Docs` workflowのsuccessを確認する。ローカルでは非本番DB検証と軽量確認を先行実施した
 
 ## 変更ファイル一覧
 
